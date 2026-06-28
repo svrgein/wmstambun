@@ -1,65 +1,100 @@
-import Image from "next/image";
+'use client';
 
-export default function Home() {
+import React from 'react';
+
+// Hooks
+import { useWarehouse } from '@/app/hooks/useWarehouse';
+
+// Styles (disuntikkan ke head)
+import { CSS } from '@/app/lib/constants';
+
+// Layout & Core
+import LoginScreen from '@/app/components/LoginScreen';
+import Sidebar from '@/app/components/Sidebar';
+import Topbar from '@/app/components/Topbar';
+
+// Pages
+import DashboardPage from '@/app/components/pages/DashboardPage';
+import ProdukPage from '@/app/components/pages/ProdukPage';
+import TokoPage from '@/app/components/pages/TokoPage';
+import AngkutanPage from '@/app/components/pages/AngkutanPage';
+import MasukPage from '@/app/components/pages/MasukPage';
+import KeluarPage from '@/app/components/pages/KeluarPage';
+import DOPage from '@/app/components/pages/DOPage';
+import PengirimanPage from '@/app/components/pages/PengirimanPage';
+import StokPage from '@/app/components/pages/StokPage';
+import PalletPage from '@/app/components/pages/PalletPage';
+import LaporanPage from '@/app/components/pages/LaporanPage';
+import AuditPage from '@/app/components/pages/AuditPage';
+import WhiteboardPage from '@/app/components/pages/WhiteboardPage';
+
+// Modals
+import ModalProduk from '@/app/components/modals/ModalProduk';
+import ModalToko from '@/app/components/modals/ModalToko';
+import ModalAngkutan from '@/app/components/modals/ModalAngkutan';
+import ModalDO from '@/app/components/modals/ModalDO';
+import ModalPengiriman from '@/app/components/modals/ModalPengiriman';
+import ModalPallet from '@/app/components/modals/ModalPallet';
+import ModalCatatan from '@/app/components/modals/ModalCatatan';
+import ModalPalletStok from '@/app/components/modals/ModalPalletStok';
+
+export default function WarehouseApp() {
+  const w = useWarehouse();
+
+  if (w.loadingUser) {
+    return <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0b0d14', color: '#e8a045' }}>Memuat sistem...</div>;
+  }
+
+  if (!w.user) {
+    return (
+      <>
+        <style>{CSS}</style>
+        <LoginScreen w={w} />
+      </>
+    );
+  }
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <>
+      <style>{CSS}</style>
+      <div className="shell">
+        <Sidebar w={w} />
+        <main className="main">
+          <Topbar w={w} />
+          <div className="content">
+            {w.activePage === 'dashboard'  && <DashboardPage w={w} />}
+            {w.activePage === 'produk'     && <ProdukPage w={w} />}
+            {w.activePage === 'toko'       && <TokoPage w={w} />}
+            {w.activePage === 'angkutan'   && <AngkutanPage w={w} />}
+            {w.activePage === 'masuk'      && <MasukPage w={w} />}
+            {w.activePage === 'keluar'     && <KeluarPage w={w} />}
+            {w.activePage === 'do'         && <DOPage w={w} />}
+            {w.activePage === 'pengiriman' && <PengirimanPage w={w} />}
+            {w.activePage === 'stok'       && <StokPage w={w} />}
+            {w.activePage === 'pallet'     && <PalletPage w={w} />}
+            {w.activePage === 'laporan'    && <LaporanPage w={w} />}
+            {w.activePage === 'audit'      && <AuditPage w={w} />}
+            {w.activePage === 'whiteboard' && <WhiteboardPage w={w} />}
+          </div>
+        </main>
+      </div>
+
+      {/* Global Toast */}
+      {w.toast.show && (
+        <div className={`toast ${w.toast.type === 'success' ? 'success' : 'error'}`}>
+          {w.toast.type === 'success' ? '✅ ' : '❌ '}{w.toast.msg}
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+      )}
+
+      {/* Modals */}
+      <ModalToko w={w} />
+      <ModalAngkutan w={w} />
+      <ModalDO w={w} />
+      <ModalProduk w={w} />
+      <ModalPengiriman w={w} />
+      <ModalPallet w={w} />
+      <ModalCatatan w={w} />
+      <ModalPalletStok w={w} />
+    </>
   );
 }
