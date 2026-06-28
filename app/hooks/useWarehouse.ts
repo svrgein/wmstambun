@@ -46,6 +46,7 @@ export function useWarehouse() {
   const [modalCatatan, setModalCatatan] = useState(false);
   const [modalPalletStok, setModalPalletStok] = useState(false);
   const [editingCatatan, setEditingCatatan] = useState<Catatan | null>(null);
+  const [editingAngkutan, setEditingAngkutan] = useState<Angkutan | null>(null);
 
   // ── Detail/selected
   const [selectedToko, setSelectedToko] = useState<Toko | null>(null);
@@ -210,18 +211,26 @@ export function useWarehouse() {
   // ── Stok: Masuk / Keluar
   const submitMasuk = async () => {
     if (!masukId || !masukQty || Number(masukQty) <= 0) { triggerToast('Form tidak valid!', 'error'); return; }
-    const { error } = await supabase.from('transaksi').insert({ produk_id: masukId, user_id: user?.id, jenis: 'masuk', jumlah_zak: Number(masukQty), no_surat: masukNoSurat || null, pihak: masukSupplier || null, keterangan: masukKet || null });
+    const prod = products.find(p => p.id === masukId);
+    const beratPerZak = prod ? prod.berat_per_zak : 50;
+    const jumlahZak = Math.round((Number(masukQty) * 1000) / beratPerZak);
+
+    const { error } = await supabase.from('transaksi').insert({ produk_id: masukId, user_id: user?.id, jenis: 'masuk', jumlah_zak: jumlahZak, no_surat: masukNoSurat || null, pihak: masukSupplier || null, keterangan: masukKet || null });
     if (error) { triggerToast(error.message, 'error'); return; }
-    triggerToast('Stok masuk tersimpan');
+    triggerToast(`Stok masuk tersimpan (${fmt(jumlahZak)} Zak)`);
     setMasukQty(''); setMasukNoSurat(''); setMasukSupplier(''); setMasukKet('');
     fetchAll();
   };
 
   const submitKeluar = async () => {
     if (!keluarId || !keluarQty || Number(keluarQty) <= 0) { triggerToast('Form tidak valid!', 'error'); return; }
-    const { error } = await supabase.from('transaksi').insert({ produk_id: keluarId, user_id: user?.id, jenis: 'keluar', jumlah_zak: Number(keluarQty), no_surat: keluarNoSurat || null, pihak: keluarCustomer || null, keterangan: keluarKet || null });
+    const prod = products.find(p => p.id === keluarId);
+    const beratPerZak = prod ? prod.berat_per_zak : 50;
+    const jumlahZak = Math.round((Number(keluarQty) * 1000) / beratPerZak);
+
+    const { error } = await supabase.from('transaksi').insert({ produk_id: keluarId, user_id: user?.id, jenis: 'keluar', jumlah_zak: jumlahZak, no_surat: keluarNoSurat || null, pihak: keluarCustomer || null, keterangan: keluarKet || null });
     if (error) { triggerToast(`Gagal: ${error.message}`, 'error'); return; }
-    triggerToast('Barang keluar divalidasi');
+    triggerToast(`Barang keluar divalidasi (${fmt(jumlahZak)} Zak)`);
     setKeluarQty(''); setKeluarNoSurat(''); setKeluarCustomer(''); setKeluarKet('');
     fetchAll();
   };
@@ -249,13 +258,27 @@ export function useWarehouse() {
   };
 
   // ── Angkutan
+  const openEditAngkutan = (a: Angkutan) => {
+    setEditingAngkutan(a);
+    setANama(a.nama_angkutan); setASopir(a.nama_sopir); setAPolisi(a.no_polisi || '');
+    setAKapasitas(String(a.kapasitas_zak)); setAStatus(a.status as any); setACatatan(a.catatan || '');
+    setModalAngkutan(true);
+  };
+
   const saveAngkutan = async () => {
     if (user?.role !== 'admin') { triggerToast('Akses ditolak: Hanya Admin yang dapat mengelola angkutan.', 'error'); return; }
     if (!aNama || !aSopir) { triggerToast('Nama angkutan dan sopir wajib diisi!', 'error'); return; }
-    const { error } = await supabase.from('angkutan').insert({ nama_angkutan: aNama, nama_sopir: aSopir, no_polisi: aPolisi || null, kapasitas_zak: Number(aKapasitas) || 200, status: aStatus, catatan: aCatatan || null });
-    if (error) { triggerToast(error.message, 'error'); return; }
-    triggerToast('Angkutan tersimpan');
-    setModalAngkutan(false); setANama(''); setASopir(''); setAPolisi(''); setACatatan('');
+    const payload = { nama_angkutan: aNama, nama_sopir: aSopir, no_polisi: aPolisi || null, kapasitas_zak: Number(aKapasitas) || 200, status: aStatus, catatan: aCatatan || null };
+    if (editingAngkutan) {
+      const { error } = await supabase.from('angkutan').update(payload).eq('id', editingAngkutan.id);
+      if (error) { triggerToast(error.message, 'error'); return; }
+      triggerToast('Angkutan berhasil diperbarui');
+    } else {
+      const { error } = await supabase.from('angkutan').insert(payload);
+      if (error) { triggerToast(error.message, 'error'); return; }
+      triggerToast('Angkutan tersimpan');
+    }
+    setModalAngkutan(false); setEditingAngkutan(null); setANama(''); setASopir(''); setAPolisi(''); setACatatan('');
     fetchAll();
   };
 
@@ -434,12 +457,20 @@ export function useWarehouse() {
   // ── Pallet balance helper
   const getPalletBalance = (): PalletBalance => {
     const total    = palletRingkasan?.total_pallet    ?? palletStok?.total_pallet    ?? 0;
-    const kosong   = palletRingkasan?.stok_gudang     ?? palletStok?.stok_gudang     ?? 0;
-    const isi      = palletRingkasan?.pallet_isi      ?? palletStok?.pallet_isi      ?? 0;
     const angkutan = palletRingkasan?.pallet_angkutan ?? palletStok?.pallet_angkutan ?? 0;
     const toko     = palletRingkasan?.stok_di_toko    ?? 0;
-    const terpakai = kosong + isi + angkutan + toko;
-    const selisih  = total - terpakai;
+    
+    // Otomatis hitung Pallet Isi berdasarkan total stok zak di gudang
+    const isi = products.reduce((acc, p) => {
+      const zakPerPallet = 2000 / (p.berat_per_zak || 50);
+      return acc + Math.floor(p.stok_zak / zakPerPallet);
+    }, 0);
+
+    // Gudang kosong adalah sisa dari total dikurangi yang sedang terpakai
+    const kosong   = total - (isi + angkutan + toko);
+    const terpakai = kosong + isi + angkutan + toko; // = total
+    const selisih  = 0; // Selalu 0 karena kosong dihitung otomatis berdasarkan total
+    
     return { total, kosong, isi, angkutan, toko, terpakai, selisih };
   };
 
@@ -461,6 +492,7 @@ export function useWarehouse() {
     modalPengiriman, setModalPengiriman, modalPallet, setModalPallet,
     modalCatatan, setModalCatatan, modalPalletStok, setModalPalletStok,
     editingCatatan, setEditingCatatan,
+    editingAngkutan, setEditingAngkutan, openEditAngkutan,
     // Selected
     selectedToko, setSelectedToko, selectedAngkutan, setSelectedAngkutan,
     selectedDO, setSelectedDO,

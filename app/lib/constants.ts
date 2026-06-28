@@ -7,10 +7,10 @@ export const statusDOBadge: Record<string, string> = {
   draft: 'b-gray', proses: 'b-yellow', selesai: 'b-green', batal: 'b-red',
 };
 export const statusAngkutanLabel: Record<string, string> = {
-  tersedia: 'Tersedia', dalam_perjalanan: 'Dalam Perjalanan', maintenance: 'Maintenance',
+  tersedia: 'Ready', dalam_perjalanan: 'Sedang Jalan', maintenance: 'Maintenance', tidak_aktif: 'Off / Absen',
 };
 export const statusAngkutanBadge: Record<string, string> = {
-  tersedia: 'b-green', dalam_perjalanan: 'b-yellow', maintenance: 'b-red',
+  tersedia: 'b-green', dalam_perjalanan: 'b-yellow', maintenance: 'b-red', tidak_aktif: 'b-gray',
 };
 export const statusPengirimanLabel: Record<string, string> = {
   persiapan: 'Persiapan', jalan: 'Dalam Perjalanan', tiba: 'Sudah Tiba',

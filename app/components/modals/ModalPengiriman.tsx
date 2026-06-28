@@ -35,7 +35,23 @@ export default function ModalPengiriman({ w }: Props) {
               <div className="flex-between text-sm"><span>Sisa yang harus dikirim:</span><span className="font-bold text-danger">{fmt(sisa)} Zak</span></div>
             </div>
           )}
-          <div className="form-group"><label>Jumlah Dibawa (Zak)</label><input type="number" value={w.pgZak} onChange={e => w.setPgZak(e.target.value)} /></div>
+          <div className="form-group">
+            <label>Jumlah Dibawa (Zak)</label>
+            <input 
+              type="number" 
+              value={w.pgZak} 
+              onChange={e => {
+                const val = e.target.value;
+                w.setPgZak(val);
+                if (doRef && doRef.do_items && doRef.do_items.length > 0) {
+                  const berat = doRef.do_items[0].produk?.berat_per_zak || 50;
+                  const zakPerPallet = 2000 / berat;
+                  const autoPallet = Math.floor(Number(val) / zakPerPallet);
+                  w.setPgPallet(autoPallet.toString());
+                }
+              }} 
+            />
+          </div>
           <div className="form-group"><label>Bawa Pallet (Opsional)</label><input type="number" value={w.pgPallet} onChange={e => w.setPgPallet(e.target.value)} placeholder="0" /></div>
           <div className="form-group full">
             <label>Status Saat Ini</label>

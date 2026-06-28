@@ -16,10 +16,18 @@ export default function MasukPage({ w }: Props) {
             <label>Jenis Semen</label>
             <select value={w.masukId} onChange={e => w.setMasukId(e.target.value)}>
               <option value="">— Pilih Semen —</option>
-              {w.products.map(p => <option key={p.id} value={p.id}>{p.merk} — {p.nama}</option>)}
+              {w.products.map(p => <option key={p.id} value={p.id}>{p.nama} ({p.berat_per_zak}kg)</option>)}
             </select>
           </div>
-          <div className="form-group"><label>Jumlah (Zak)</label><input type="number" value={w.masukQty} onChange={e => w.setMasukQty(e.target.value)} placeholder="0" /></div>
+          <div className="form-group">
+            <label>Jumlah Muatan (Ton)</label>
+            <input type="number" step="0.1" value={w.masukQty} onChange={e => w.setMasukQty(e.target.value)} placeholder="Misal: 8.5" />
+            {w.masukId && w.masukQty && (
+              <div className="text-sm mt-14" style={{ marginTop: '4px', color: '#e8a045' }}>
+                ℹ️ Setara dengan: <strong>{fmt(Math.round((Number(w.masukQty) * 1000) / (w.products.find(p => p.id === w.masukId)?.berat_per_zak || 50)))} Zak</strong>
+              </div>
+            )}
+          </div>
           <div className="form-group"><label>No. Surat Jalan</label><input value={w.masukNoSurat} onChange={e => w.setMasukNoSurat(e.target.value)} placeholder="SJ-001" /></div>
           <div className="form-group full"><label>Supplier / Vendor</label><input value={w.masukSupplier} onChange={e => w.setMasukSupplier(e.target.value)} placeholder="PT Semen Indonesia Tbk" /></div>
           <div className="form-group full"><label>Keterangan</label><input value={w.masukKet} onChange={e => w.setMasukKet(e.target.value)} placeholder="Opsional" /></div>

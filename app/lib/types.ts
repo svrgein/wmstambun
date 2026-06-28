@@ -51,7 +51,7 @@ export interface Angkutan {
   nama_sopir: string;
   no_polisi: string;
   kapasitas_zak: number;
-  status: 'tersedia' | 'dalam_perjalanan' | 'maintenance';
+  status: 'tersedia' | 'dalam_perjalanan' | 'maintenance' | 'tidak_aktif';
   catatan: string;
   created_at: string;
 }

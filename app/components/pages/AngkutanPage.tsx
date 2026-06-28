@@ -90,18 +90,41 @@ export default function AngkutanPage({ w }: Props) {
       </div>
       <div className="table-wrap">
         <table>
-          <thead><tr><th>Nama Sopir</th><th>No Polisi</th><th>Kapasitas</th><th>Status</th><th>DO Aktif</th><th>Detail</th></tr></thead>
+          <thead><tr><th>Nama Sopir</th><th>Nama Angkutan</th><th>Kapasitas</th><th>Status</th><th>Aksi</th></tr></thead>
           <tbody>
             {w.angkutans.map(a => {
-              const doAktif = w.deliveryOrders.find(d => d.angkutan_id === a.id && d.status === 'proses');
               return (
-                <tr key={a.id}>
-                  <td><div className="font-bold">{a.nama_sopir}</div><div className="text-xs text-muted">{a.nama_angkutan}</div></td>
-                  <td style={{ fontFamily: 'monospace', fontWeight: 700 }}>{a.no_polisi || '—'}</td>
+                <tr key={a.id} style={{ opacity: a.status === 'tidak_aktif' ? 0.6 : 1 }}>
+                  <td>
+                    <div className="font-bold">{a.nama_sopir}</div>
+                    <div className="text-xs text-muted" style={{ marginTop: '2px' }}>{a.no_polisi || '—'}</div>
+                  </td>
+                  <td>{a.nama_angkutan}</td>
                   <td>{fmt(a.kapasitas_zak)} Zak</td>
                   <td><span className={`badge ${statusAngkutanBadge[a.status]}`}>{statusAngkutanLabel[a.status]}</span></td>
-                  <td>{doAktif ? <span className="text-accent font-bold text-sm">{doAktif.no_do}</span> : <span className="text-muted">—</span>}</td>
-                  <td><button className="btn btn-blue btn-sm" onClick={() => w.setSelectedAngkutan(a)}>Detail</button></td>
+                  <td>
+                    <div className="flex-row">
+                      {w.user?.role === 'admin' && (
+                        <button
+                          className="btn btn-ghost btn-sm"
+                          onClick={async () => {
+                            const newStatus = a.status === 'tersedia' ? 'tidak_aktif' : 'tersedia';
+                            await w.supabase.from('angkutan').update({ status: newStatus }).eq('id', a.id);
+                            w.triggerToast(`${a.nama_sopir} ditandai ${statusAngkutanLabel[newStatus]}`);
+                            w.fetchAll();
+                          }}
+                          title="Tandai Hadir / Absen"
+                          disabled={a.status === 'dalam_perjalanan'}
+                        >
+                          {a.status === 'tersedia' ? '💤 Tandai Absen' : '✅ Tandai Ready'}
+                        </button>
+                      )}
+                      {w.user?.role === 'admin' && (
+                        <button className="btn btn-ghost btn-sm" onClick={() => w.openEditAngkutan(a)}>✏️</button>
+                      )}
+                      <button className="btn btn-blue btn-sm" onClick={() => w.setSelectedAngkutan(a)}>Detail</button>
+                    </div>
+                  </td>
                 </tr>
               );
             })}

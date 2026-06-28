@@ -68,15 +68,16 @@ export default function DashboardPage({ w }: Props) {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '18px', marginBottom: '18px' }}>
         {/* Kapasitas stok */}
         <div className="card">
-          <div className="card-title">Kapasitas Stok per Jenis (vs 600 Zak)</div>
+          <div className="card-title">Kapasitas Stok per Jenis</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '11px' }}>
             {w.products.map(p => {
               const pct = Math.min((p.stok_zak / 600) * 100, 100);
+              const tonase = (p.stok_zak * p.berat_per_zak) / 1000;
               return (
                 <div key={p.id}>
                   <div className="flex-between text-sm" style={{ marginBottom: '4px' }}>
                     <span>{p.merk} — {p.nama}</span>
-                    <span className="font-bold">{fmt(p.stok_zak)} Zak</span>
+                    <span className="font-bold">{tonase % 1 === 0 ? tonase : tonase.toFixed(1)} Ton ({fmt(p.stok_zak)} Zak)</span>
                   </div>
                   <div className="pbar-wrap">
                     <div className="pbar" style={{ width: `${pct}%`, background: p.stok_rendah ? 'var(--danger)' : 'var(--accent)' }} />

@@ -8,11 +8,11 @@ interface Props { w: UseWarehouseReturn; }
 export default function ModalAngkutan({ w }: Props) {
   if (!w.modalAngkutan) return null;
   return (
-    <div className="modal-overlay" onClick={() => w.setModalAngkutan(false)}>
+    <div className="modal-overlay" onClick={() => { w.setEditingAngkutan(null); w.setModalAngkutan(false); }}>
       <div className="modal" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
-          <div className="modal-title">🚚 Tambah Angkutan & Supir</div>
-          <button className="modal-close" onClick={() => w.setModalAngkutan(false)}>✕</button>
+          <div className="modal-title">🚚 {w.editingAngkutan ? 'Edit' : 'Tambah'} Angkutan & Supir</div>
+          <button className="modal-close" onClick={() => { w.setEditingAngkutan(null); w.setModalAngkutan(false); }}>✕</button>
         </div>
         <div className="form-grid">
           <div className="form-group full"><label>Nama Sopir / PIC</label><input value={w.aSopir} onChange={e => w.setASopir(e.target.value)} placeholder="Pak Budi" /></div>
@@ -29,7 +29,7 @@ export default function ModalAngkutan({ w }: Props) {
           </div>
           <div className="form-group full"><label>Catatan</label><input value={w.aCatatan} onChange={e => w.setACatatan(e.target.value)} /></div>
         </div>
-        <button className="btn btn-primary w-full" style={{ marginTop: '20px', justifyContent: 'center' }} onClick={w.saveAngkutan}>Simpan Angkutan</button>
+        <button className="btn btn-primary w-full" style={{ marginTop: '20px', justifyContent: 'center' }} onClick={w.saveAngkutan}>{w.editingAngkutan ? 'Perbarui' : 'Simpan'} Angkutan</button>
       </div>
     </div>
   );
