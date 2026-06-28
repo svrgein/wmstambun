@@ -110,6 +110,10 @@ export default function AngkutanPage({ w }: Props) {
                           onClick={async () => {
                             const newStatus = a.status === 'tersedia' ? 'tidak_aktif' : 'tersedia';
                             await w.supabase.from('angkutan').update({ status: newStatus }).eq('id', a.id);
+                            await w.supabase.from('audit_log').insert({
+                              user_id: w.user?.id, tabel: 'angkutan', aksi: 'UPDATE',
+                              ringkasan: `Angkutan ${a.nama_sopir} (${a.nama_angkutan}) status → ${statusAngkutanLabel[newStatus]}`,
+                            });
                             w.triggerToast(`${a.nama_sopir} ditandai ${statusAngkutanLabel[newStatus]}`);
                             w.fetchAll();
                           }}

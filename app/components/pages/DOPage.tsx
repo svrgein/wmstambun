@@ -64,6 +64,10 @@ export default function DOPage({ w }: Props) {
                   <button className="btn btn-success" onClick={async () => {
                     await w.supabase.from('delivery_order').update({ status: 'selesai' }).eq('id', w.selectedDO!.id);
                     if (w.selectedDO!.angkutan_id) await w.supabase.from('angkutan').update({ status: 'tersedia' }).eq('id', w.selectedDO!.angkutan_id);
+                    await w.supabase.from('audit_log').insert({
+                      user_id: w.user?.id, tabel: 'delivery_order', aksi: 'UPDATE',
+                      ringkasan: `DO ${w.selectedDO!.no_do} ditandai SELESAI`,
+                    });
                     w.triggerToast(`${w.selectedDO!.no_do} ditandai selesai`);
                     w.fetchAll();
                     w.setSelectedDO(prev => prev ? { ...prev, status: 'selesai' } : prev);
@@ -73,6 +77,10 @@ export default function DOPage({ w }: Props) {
                   <button className="btn btn-ghost" onClick={async () => {
                     if (!confirm('Batalkan DO ini?')) return;
                     await w.supabase.from('delivery_order').update({ status: 'batal' }).eq('id', w.selectedDO!.id);
+                    await w.supabase.from('audit_log').insert({
+                      user_id: w.user?.id, tabel: 'delivery_order', aksi: 'UPDATE',
+                      ringkasan: `DO ${w.selectedDO!.no_do} DIBATALKAN`,
+                    });
                     w.triggerToast(`${w.selectedDO!.no_do} dibatalkan`, 'error');
                     w.fetchAll();
                     w.setSelectedDO(null);
@@ -110,12 +118,20 @@ export default function DOPage({ w }: Props) {
                             {pg.status === 'persiapan' && (
                               <button className="btn btn-sm" style={{ background: 'var(--warn)', color: '#000', padding: '3px 9px', fontSize: '11px' }} onClick={async () => {
                                 await w.supabase.from('pengiriman').update({ status: 'jalan' }).eq('id', pg.id);
+                                await w.supabase.from('audit_log').insert({
+                                  user_id: w.user?.id, tabel: 'pengiriman', aksi: 'UPDATE',
+                                  ringkasan: `Pengiriman tahap ${pg.tahap} ${w.selectedDO?.no_do || ''} BERANGKAT (${fmt(pg.jumlah_zak)} zak)`,
+                                });
                                 w.triggerToast(`Tahap ${pg.tahap} berangkat`); w.fetchAll();
                               }}>🚚 Berangkat</button>
                             )}
                             {pg.status === 'jalan' && (
                               <button className="btn btn-success btn-sm" style={{ padding: '3px 9px', fontSize: '11px' }} onClick={async () => {
                                 await w.supabase.from('pengiriman').update({ status: 'tiba', waktu_tiba: new Date().toISOString() }).eq('id', pg.id);
+                                await w.supabase.from('audit_log').insert({
+                                  user_id: w.user?.id, tabel: 'pengiriman', aksi: 'UPDATE',
+                                  ringkasan: `Pengiriman tahap ${pg.tahap} ${w.selectedDO?.no_do || ''} TIBA di toko (${fmt(pg.jumlah_zak)} zak)`,
+                                });
                                 w.triggerToast(`Tahap ${pg.tahap} tiba di toko`); w.fetchAll();
                               }}>✅ Tiba</button>
                             )}

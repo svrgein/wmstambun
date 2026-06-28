@@ -32,8 +32,8 @@ export default function PengirimanPage({ w }: Props) {
                   <td>{fmtDate(pg.waktu_berangkat)} {fmtTime(pg.waktu_berangkat)}</td>
                   <td><span className={`badge ${pg.status === 'tiba' ? 'b-green' : pg.status === 'jalan' ? 'b-yellow' : 'b-gray'}`}>{statusPengirimanLabel[pg.status]}</span></td>
                   <td>
-                    {pg.status === 'persiapan' && <button className="btn btn-sm" style={{ background: 'var(--warn)', color: '#000', padding: '3px 9px', fontSize: '11px' }} onClick={async () => { await w.supabase.from('pengiriman').update({ status: 'jalan' }).eq('id', pg.id); w.triggerToast('Berangkat'); w.fetchAll(); }}>🚚</button>}
-                    {pg.status === 'jalan'     && <button className="btn btn-success btn-sm" style={{ padding: '3px 9px', fontSize: '11px' }} onClick={async () => { await w.supabase.from('pengiriman').update({ status: 'tiba', waktu_tiba: new Date().toISOString() }).eq('id', pg.id); w.triggerToast('Tiba!'); w.fetchAll(); }}>✅</button>}
+                    {pg.status === 'persiapan' && <button className="btn btn-sm" style={{ background: 'var(--warn)', color: '#000', padding: '3px 9px', fontSize: '11px' }} onClick={async () => { await w.supabase.from('pengiriman').update({ status: 'jalan' }).eq('id', pg.id); await w.supabase.from('audit_log').insert({ user_id: w.user?.id, tabel: 'pengiriman', aksi: 'UPDATE', ringkasan: `Pengiriman tahap ${pg.tahap} ${(pg as any).do.no_do} BERANGKAT (${fmt(pg.jumlah_zak)} zak)` }); w.triggerToast('Berangkat'); w.fetchAll(); }}>🚚</button>}
+                    {pg.status === 'jalan'     && <button className="btn btn-success btn-sm" style={{ padding: '3px 9px', fontSize: '11px' }} onClick={async () => { await w.supabase.from('pengiriman').update({ status: 'tiba', waktu_tiba: new Date().toISOString() }).eq('id', pg.id); await w.supabase.from('audit_log').insert({ user_id: w.user?.id, tabel: 'pengiriman', aksi: 'UPDATE', ringkasan: `Pengiriman tahap ${pg.tahap} ${(pg as any).do.no_do} TIBA (${fmt(pg.jumlah_zak)} zak)` }); w.triggerToast('Tiba!'); w.fetchAll(); }}>✅</button>}
                   </td>
                 </tr>
               ))

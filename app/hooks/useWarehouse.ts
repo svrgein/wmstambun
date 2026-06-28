@@ -217,6 +217,10 @@ export function useWarehouse() {
 
     const { error } = await supabase.from('transaksi').insert({ produk_id: masukId, user_id: user?.id, jenis: 'masuk', jumlah_zak: jumlahZak, no_surat: masukNoSurat || null, pihak: masukSupplier || null, keterangan: masukKet || null });
     if (error) { triggerToast(error.message, 'error'); return; }
+    await supabase.from('audit_log').insert({
+      user_id: user?.id, tabel: 'transaksi', aksi: 'INSERT',
+      ringkasan: `Stok masuk ${prod?.merk || ''} ${prod?.nama || ''}: ${fmt(jumlahZak)} Zak${masukSupplier ? ` dari ${masukSupplier}` : ''}${masukNoSurat ? ` (Surat: ${masukNoSurat})` : ''}`,
+    });
     triggerToast(`Stok masuk tersimpan (${fmt(jumlahZak)} Zak)`);
     setMasukQty(''); setMasukNoSurat(''); setMasukSupplier(''); setMasukKet('');
     fetchAll();
@@ -230,6 +234,10 @@ export function useWarehouse() {
 
     const { error } = await supabase.from('transaksi').insert({ produk_id: keluarId, user_id: user?.id, jenis: 'keluar', jumlah_zak: jumlahZak, no_surat: keluarNoSurat || null, pihak: keluarCustomer || null, keterangan: keluarKet || null });
     if (error) { triggerToast(`Gagal: ${error.message}`, 'error'); return; }
+    await supabase.from('audit_log').insert({
+      user_id: user?.id, tabel: 'transaksi', aksi: 'INSERT',
+      ringkasan: `Stok keluar ${prod?.merk || ''} ${prod?.nama || ''}: ${fmt(jumlahZak)} Zak${keluarCustomer ? ` ke ${keluarCustomer}` : ''}${keluarNoSurat ? ` (Surat: ${keluarNoSurat})` : ''}`,
+    });
     triggerToast(`Barang keluar divalidasi (${fmt(jumlahZak)} Zak)`);
     setKeluarQty(''); setKeluarNoSurat(''); setKeluarCustomer(''); setKeluarKet('');
     fetchAll();
@@ -241,6 +249,10 @@ export function useWarehouse() {
     if (!pNama || !pMerk) { triggerToast('Nama dan Merk wajib diisi!', 'error'); return; }
     const { error } = await supabase.from('produk').insert({ nama: pNama, merk: pMerk, berat_per_zak: Number(pBerat) || 50, stok_minimal: Number(pMinimal) || 100, keterangan: pKet || null });
     if (error) { triggerToast(error.message, 'error'); return; }
+    await supabase.from('audit_log').insert({
+      user_id: user?.id, tabel: 'produk', aksi: 'INSERT',
+      ringkasan: `Produk baru: ${pMerk} ${pNama} (${pBerat}kg/zak, minimal ${pMinimal} zak)`,
+    });
     triggerToast('Produk tersimpan');
     setModalProduk(false); setPNama(''); setPMerk(''); setPKet('');
     fetchAll();
@@ -252,6 +264,10 @@ export function useWarehouse() {
     if (!tNama) { triggerToast('Nama toko wajib diisi!', 'error'); return; }
     const { error } = await supabase.from('toko').insert({ nama: tNama, pemilik: tPemilik || null, alamat: tAlamat || null, no_hp: tHP || null, batas_pallet: Number(tBatasPallet) || 0, catatan: tCatatan || null });
     if (error) { triggerToast(error.message, 'error'); return; }
+    await supabase.from('audit_log').insert({
+      user_id: user?.id, tabel: 'toko', aksi: 'INSERT',
+      ringkasan: `Toko baru: ${tNama}${tPemilik ? ` (${tPemilik})` : ''}${tAlamat ? ` — ${tAlamat}` : ''}`,
+    });
     triggerToast('Toko tersimpan');
     setModalToko(false); setTNama(''); setTPemilik(''); setTAlamat(''); setTHP(''); setTBatasPallet('0'); setTCatatan('');
     fetchAll();
@@ -272,10 +288,18 @@ export function useWarehouse() {
     if (editingAngkutan) {
       const { error } = await supabase.from('angkutan').update(payload).eq('id', editingAngkutan.id);
       if (error) { triggerToast(error.message, 'error'); return; }
+      await supabase.from('audit_log').insert({
+        user_id: user?.id, tabel: 'angkutan', aksi: 'UPDATE',
+        ringkasan: `Edit angkutan: ${aNama} (${aSopir}) — ${aPolisi || 'tanpa polisi'}, status: ${aStatus}`,
+      });
       triggerToast('Angkutan berhasil diperbarui');
     } else {
       const { error } = await supabase.from('angkutan').insert(payload);
       if (error) { triggerToast(error.message, 'error'); return; }
+      await supabase.from('audit_log').insert({
+        user_id: user?.id, tabel: 'angkutan', aksi: 'INSERT',
+        ringkasan: `Angkutan baru: ${aNama} (${aSopir}) — ${aPolisi || 'tanpa polisi'}, kapasitas ${aKapasitas} zak`,
+      });
       triggerToast('Angkutan tersimpan');
     }
     setModalAngkutan(false); setEditingAngkutan(null); setANama(''); setASopir(''); setAPolisi(''); setACatatan('');
@@ -305,6 +329,12 @@ export function useWarehouse() {
       validItems.map(i => ({ do_id: doData.id, produk_id: i.produk_id, jumlah_zak: i.jumlah_zak }))
     );
     if (itemErr) { triggerToast(itemErr.message, 'error'); return; }
+    const doToko = tokos.find(t => t.id === doTokoId);
+    const doAngkut = angkutans.find(a => a.id === doAngkutanId);
+    await supabase.from('audit_log').insert({
+      user_id: user?.id, tabel: 'delivery_order', aksi: 'INSERT',
+      ringkasan: `DO baru ${noDO}: ${fmt(totalZak)} zak → ${doToko?.nama || ''} via ${doAngkut?.nama_sopir || ''} (${validItems.length} item)`,
+    });
     triggerToast(`DO ${noDO} berhasil dibuat`);
     setModalDO(false); setDoTokoId(''); setDoAngkutanId(''); setDoCatatan('');
     setDoItems([{ produk_id: '', jumlah_zak: 0 }]);
@@ -369,12 +399,20 @@ export function useWarehouse() {
         judul: cJudul || 'Catatan', isi: cIsi, warna: cWarna, updated_at: new Date().toISOString(),
       }).eq('id', editingCatatan.id);
       if (error) { triggerToast(error.message, 'error'); return; }
+      await supabase.from('audit_log').insert({
+        user_id: user?.id, tabel: 'catatan', aksi: 'UPDATE',
+        ringkasan: `Edit catatan: "${cJudul || 'Catatan'}"`,
+      });
       triggerToast('Catatan diperbarui');
     } else {
       const { error } = await supabase.from('catatan').insert({
         user_id: user?.id, judul: cJudul || 'Catatan', isi: cIsi, warna: cWarna,
       });
       if (error) { triggerToast(error.message, 'error'); return; }
+      await supabase.from('audit_log').insert({
+        user_id: user?.id, tabel: 'catatan', aksi: 'INSERT',
+        ringkasan: `Catatan baru: "${cJudul || 'Catatan'}"`,
+      });
       triggerToast('Catatan disimpan');
     }
     setModalCatatan(false); setCJudul(''); setCIsi(''); setCWarna('#e8a045'); setEditingCatatan(null);
@@ -383,7 +421,12 @@ export function useWarehouse() {
 
   const deleteCatatan = async (id: string) => {
     if (!confirm('Hapus catatan ini?')) return;
+    const cat = catatan.find(c => c.id === id);
     await supabase.from('catatan').delete().eq('id', id);
+    await supabase.from('audit_log').insert({
+      user_id: user?.id, tabel: 'catatan', aksi: 'DELETE',
+      ringkasan: `Hapus catatan: "${cat?.judul || 'Catatan'}"`,
+    });
     triggerToast('Catatan dihapus');
     fetchAll();
   };
