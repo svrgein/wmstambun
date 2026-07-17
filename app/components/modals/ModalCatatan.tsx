@@ -15,11 +15,21 @@ export default function ModalCatatan({ w }: Props) {
           <button className="modal-close" onClick={() => w.setModalCatatan(false)}>✕</button>
         </div>
         <div className="form-group mb-16"><label>Judul</label><input value={w.cJudul} onChange={e => w.setCJudul(e.target.value)} placeholder="Cth: Jadwal Maintenance" /></div>
-        <div className="form-group mb-16"><label>Isi Catatan</label><textarea value={w.cIsi} onChange={e => w.setCIsi(e.target.value)} style={{ minHeight: '120px' }} placeholder="Tulis catatan di sini..." /></div>
+        <div className="form-group mb-16"><label>Isi Catatan</label><textarea value={w.cIsi} onChange={e => w.setCIsi(e.target.value)} style={{ minHeight: '120px' }} placeholder="Tulis catatan di sini... Gunakan @nama untuk mention" /></div>
+        <div className="form-group mb-16">
+          <label>Kategori / Jenis</label>
+          <select value={w.cWarna} onChange={e => w.setCWarna(e.target.value)}>
+            <option value="#e05252">DO</option>
+            <option value="#5b8af5">Angkutan</option>
+            <option value="#e8a045">Operasional</option>
+            <option value="#4caf7d">Barang</option>
+            <option value="#a259f7">Lainnya</option>
+          </select>
+        </div>
         <div className="form-group mb-16">
           <label>Warna Label</label>
           <div className="flex-row gap-12">
-            {['#e8a045', '#5b8af5', '#4caf7d', '#e05252', '#a259f7', '#3a3f60'].map(color => (
+            {['#e05252', '#5b8af5', '#e8a045', '#4caf7d', '#a259f7', '#3a3f60'].map(color => (
               <div key={color} style={{ width: '28px', height: '28px', borderRadius: '50%', background: color, cursor: 'pointer', border: w.cWarna === color ? '2px solid #fff' : '2px solid transparent', transform: w.cWarna === color ? 'scale(1.1)' : 'scale(1)' }} onClick={() => w.setCWarna(color)} />
             ))}
           </div>

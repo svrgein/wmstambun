@@ -30,7 +30,7 @@ export interface Transaction {
 export interface UserProfile {
   id: string;
   nama: string;
-  role: 'admin' | 'operator';
+  role: 'admin' | 'operator' | 'superadmin';
   email?: string;
 }
 
@@ -84,6 +84,7 @@ export interface DOItem {
 export interface Pengiriman {
   id: string;
   do_id: string;
+  angkutan_id?: string | null;
   tahap: number;
   jumlah_zak: number;
   jumlah_pallet: number;
@@ -91,6 +92,7 @@ export interface Pengiriman {
   waktu_tiba: string | null;
   status: 'persiapan' | 'jalan' | 'tiba';
   catatan: string;
+  angkutan?: Angkutan;
 }
 
 export interface PalletLog {

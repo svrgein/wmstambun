@@ -38,7 +38,7 @@ export default function Sidebar({ w }: Props) {
           <button className={`nav-item ${w.activePage === 'stok' ? 'active' : ''}`} onClick={() => w.setActivePage('stok')}>📈 Stok Semen</button>
           <button className={`nav-item ${w.activePage === 'pallet' ? 'active' : ''}`} onClick={() => w.setActivePage('pallet')}>🟫 Peredaran Pallet</button>
           <button className={`nav-item ${w.activePage === 'laporan' ? 'active' : ''}`} onClick={() => w.setActivePage('laporan')}>📑 Riwayat Transaksi</button>
-          {w.user?.role === 'admin' && (
+          {(w.user?.role === 'admin' || w.user?.role === 'superadmin') && (
             <button className={`nav-item ${w.activePage === 'audit' ? 'active' : ''}`} onClick={() => w.setActivePage('audit')}>🔍 Audit Log</button>
           )}
         </div>

@@ -17,6 +17,10 @@ export default function ModalDO({ w }: Props) {
         </div>
         <div className="form-grid" style={{ marginBottom: '16px' }}>
           <div className="form-group full">
+            <label>No SDO</label>
+            <input value={w.doNoDO} onChange={e => w.setDoNoDO(e.target.value)} placeholder="Masukkan No SDO" />
+          </div>
+          <div className="form-group full">
             <label>Toko Tujuan</label>
             <select value={w.doTokoId} onChange={e => w.setDoTokoId(e.target.value)}>
               <option value="">— Pilih Toko —</option>

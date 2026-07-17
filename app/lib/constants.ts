@@ -19,13 +19,20 @@ export const statusPengirimanLabel: Record<string, string> = {
 // ─── CSS ───────────────────────────────────────────────────────────────────────
 
 export const CSS = `
-  :root {
+  :root, [data-theme="dark"] {
     --bg: #0b0d14; --surface: #13151f; --card: #1a1d2b; --card2: #1f2235;
     --border: #252840; --border2: #2e3150;
     --accent: #e8a045; --accent2: #5b8af5; --accent3: #a259f7;
     --danger: #e05252; --success: #4caf7d; --warn: #f0c040;
     --text: #e8eaf0; --muted: #6b7090; --faint: #3a3f60;
     --font: 'Segoe UI', system-ui, sans-serif;
+  }
+  [data-theme="light"] {
+    --bg: #f3f4f6; --surface: #ffffff; --card: #ffffff; --card2: #f9fafb;
+    --border: #e5e7eb; --border2: #d1d5db;
+    --accent: #d97706; --accent2: #2563eb; --accent3: #7c3aed;
+    --danger: #dc2626; --success: #059669; --warn: #d97706;
+    --text: #111827; --muted: #6b7280; --faint: #f3f4f6;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 13.5px; }
@@ -63,6 +70,7 @@ export const CSS = `
   .stat-card.blue::before   { background: var(--accent2); }
   .stat-card.green::before  { background: var(--success); }
   .stat-card.red::before    { background: var(--danger); }
+  .stat-card.pink::before   { background: #ec4899; }
   .stat-card.purple::before { background: var(--accent3); }
   .stat-card.yellow::before { background: var(--warn); }
   .stat-card.white::before  { background: var(--text); }

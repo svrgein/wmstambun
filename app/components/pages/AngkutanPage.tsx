@@ -84,27 +84,30 @@ export default function AngkutanPage({ w }: Props) {
     <div>
       <div className="section-header">
         <div className="section-title">Armada Angkutan ({w.angkutans.length})</div>
-        {w.user?.role === 'admin' && (
+        {(w.user?.role === 'admin' || w.user?.role === 'superadmin') && (
           <button className="btn btn-primary" onClick={() => w.setModalAngkutan(true)}>+ Tambah Angkutan</button>
         )}
       </div>
-      <div className="table-wrap">
-        <table>
-          <thead><tr><th>Nama Sopir</th><th>Nama Angkutan</th><th>Kapasitas</th><th>Status</th><th>Aksi</th></tr></thead>
-          <tbody>
-            {w.angkutans.map(a => {
-              return (
-                <tr key={a.id} style={{ opacity: a.status === 'tidak_aktif' ? 0.6 : 1 }}>
-                  <td>
-                    <div className="font-bold">{a.nama_sopir}</div>
-                    <div className="text-xs text-muted" style={{ marginTop: '2px' }}>{a.no_polisi || '—'}</div>
-                  </td>
-                  <td>{a.nama_angkutan}</td>
-                  <td>{fmt(a.kapasitas_zak)} Zak</td>
-                  <td><span className={`badge ${statusAngkutanBadge[a.status]}`}>{statusAngkutanLabel[a.status]}</span></td>
-                  <td>
-                    <div className="flex-row">
-                      {w.user?.role === 'admin' && (
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '18px' }}>
+        {(['GMS', 'TMS', 'IMK'] as const).map(cat => {
+          const items = w.angkutanGroups?.[cat] || [];
+          return (
+            <div className="card" key={cat}>
+              <div className="card-title">{cat} ({items.length})</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {items.length === 0 && <div className="text-muted text-sm">Belum ada angkutan {cat}.</div>}
+                {items.map(a => (
+                  <div key={a.id} style={{ padding: '12px', background: 'var(--surface)', borderRadius: '10px', border: '1px solid var(--border)' }}>
+                    <div className="flex-between" style={{ gap: '10px' }}>
+                      <div>
+                        <div className="font-bold">{a.nama_sopir}</div>
+                        <div className="text-xs text-muted" style={{ marginTop: '3px' }}>{a.nama_angkutan} · {a.no_polisi || '—'}</div>
+                      </div>
+                      <span className={`badge ${statusAngkutanBadge[a.status]}`}>{statusAngkutanLabel[a.status]}</span>
+                    </div>
+                    <div className="text-xs text-muted" style={{ marginTop: '10px' }}>{fmt(a.kapasitas_zak)} Zak</div>
+                    <div className="flex-row" style={{ gap: '8px', marginTop: '10px' }}>
+                      {(w.user?.role === 'admin' || w.user?.role === 'superadmin') && (
                         <button
                           className="btn btn-ghost btn-sm"
                           onClick={async () => {
@@ -120,22 +123,49 @@ export default function AngkutanPage({ w }: Props) {
                           title="Tandai Hadir / Absen"
                           disabled={a.status === 'dalam_perjalanan'}
                         >
-                          {a.status === 'tersedia' ? '💤 Tandai Absen' : '✅ Tandai Ready'}
+                          {a.status === 'tersedia' ? '💤 Absen' : '✅ Ready'}
                         </button>
                       )}
-                      {w.user?.role === 'admin' && (
-                        <button className="btn btn-ghost btn-sm" onClick={() => w.openEditAngkutan(a)}>✏️</button>
+                      {(w.user?.role === 'admin' || w.user?.role === 'superadmin') && (
+                        <>
+                          <button className="btn btn-ghost btn-sm" onClick={() => w.openEditAngkutan(a)}>✏️</button>
+                          <button className="btn btn-danger btn-sm" onClick={() => w.deleteAngkutan(a.id)}>🗑️</button>
+                        </>
                       )}
                       <button className="btn btn-blue btn-sm" onClick={() => w.setSelectedAngkutan(a)}>Detail</button>
                     </div>
-                  </td>
-                </tr>
-              );
-            })}
-            {w.angkutans.length === 0 && <tr className="empty-row"><td colSpan={6}>Belum ada angkutan.</td></tr>}
-          </tbody>
-        </table>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
       </div>
+      {w.angkutanGroups?.Lainnya?.length ? (
+        <div className="card" style={{ marginTop: '18px' }}>
+          <div className="card-title">Lainnya ({w.angkutanGroups.Lainnya.length})</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {w.angkutanGroups.Lainnya.map(a => (
+              <div key={a.id} style={{ padding: '12px', background: 'var(--surface)', borderRadius: '10px', border: '1px solid var(--border)' }}>
+                <div className="flex-between" style={{ gap: '10px' }}>
+                  <div>
+                    <div className="font-bold">{a.nama_sopir}</div>
+                    <div className="text-xs text-muted" style={{ marginTop: '3px' }}>{a.nama_angkutan} · {a.no_polisi || '—'}</div>
+                  </div>
+                  <span className={`badge ${statusAngkutanBadge[a.status]}`}>{statusAngkutanLabel[a.status]}</span>
+                </div>
+                <div className="text-xs text-muted" style={{ marginTop: '10px' }}>{fmt(a.kapasitas_zak)} Zak</div>
+                <div className="flex-row" style={{ gap: '8px', marginTop: '10px' }}>
+                  {(w.user?.role === 'admin' || w.user?.role === 'superadmin') && (
+                    <button className="btn btn-ghost btn-sm" onClick={() => w.openEditAngkutan(a)}>✏️</button>
+                  )}
+                  <button className="btn btn-blue btn-sm" onClick={() => w.setSelectedAngkutan(a)}>Detail</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

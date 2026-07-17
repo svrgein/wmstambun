@@ -103,7 +103,7 @@ export default function TokoPage({ w }: Props) {
     <div>
       <div className="section-header">
         <div className="section-title">Mitra Toko ({w.tokos.length})</div>
-        {w.user?.role === 'admin' && (
+        {(w.user?.role === 'admin' || w.user?.role === 'superadmin') && (
           <button className="btn btn-primary" onClick={() => w.setModalToko(true)}>+ Tambah Toko</button>
         )}
       </div>

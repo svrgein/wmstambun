@@ -2,7 +2,7 @@
 
 import React from 'react';
 import type { UseWarehouseReturn } from '@/app/hooks/useWarehouse';
-import { fmt, fmtDate, fmtTime } from '@/app/lib/helpers';
+import { fmt, fmtDate, fmtTime, fmtTon } from '@/app/lib/helpers';
 import { statusDOBadge, statusDOLabel, statusPengirimanLabel } from '@/app/lib/constants';
 
 interface Props { w: UseWarehouseReturn; }
@@ -48,7 +48,7 @@ export default function DOPage({ w }: Props) {
                         <td>{item.produk?.nama || '—'}</td>
                         <td>{item.produk?.merk || '—'}</td>
                         <td className="font-bold">{fmt(item.jumlah_zak)} Zak</td>
-                        <td className="text-blue">{((item.jumlah_zak * (item.produk?.berat_per_zak || 50)) / 1000).toFixed(2)} T</td>
+                        <td className="text-blue">{fmtTon((item.jumlah_zak * (item.produk?.berat_per_zak || 50)) / 1000)} T</td>
                       </tr>
                     ))}
                     {items.length === 0 && <tr className="empty-row"><td colSpan={4}>Tidak ada item.</td></tr>}
@@ -73,7 +73,7 @@ export default function DOPage({ w }: Props) {
                     w.setSelectedDO(prev => prev ? { ...prev, status: 'selesai' } : prev);
                   }}>✅ Tandai Selesai</button>
                 )}
-                {w.user?.role === 'admin' && (
+                {(w.user?.role === 'admin' || w.user?.role === 'superadmin') && (
                   <button className="btn btn-ghost" onClick={async () => {
                     if (!confirm('Batalkan DO ini?')) return;
                     await w.supabase.from('delivery_order').update({ status: 'batal' }).eq('id', w.selectedDO!.id);
@@ -112,31 +112,35 @@ export default function DOPage({ w }: Props) {
                           <span className="text-accent font-bold">{fmt(pg.jumlah_zak)} Zak</span>
                           {pg.jumlah_pallet > 0 && <span className="text-muted"> · {pg.jumlah_pallet} Pallet</span>}
                         </div>
+                        <div className="text-xs text-muted" style={{ marginTop: '3px' }}>
+                          Supir Tahap: {pg.angkutan?.nama_sopir || w.selectedDO.angkutan?.nama_sopir || '—'}{pg.angkutan?.no_polisi ? ` · ${pg.angkutan.no_polisi}` : w.selectedDO.angkutan?.no_polisi ? ` · ${w.selectedDO.angkutan.no_polisi}` : ''}
+                        </div>
                         {pg.catatan && <div className="text-xs text-muted" style={{ marginTop: '3px' }}>{pg.catatan}</div>}
-                        {pg.status !== 'tiba' && (
-                          <div className="flex-row" style={{ marginTop: '8px', gap: '6px' }}>
-                            {pg.status === 'persiapan' && (
-                              <button className="btn btn-sm" style={{ background: 'var(--warn)', color: '#000', padding: '3px 9px', fontSize: '11px' }} onClick={async () => {
-                                await w.supabase.from('pengiriman').update({ status: 'jalan' }).eq('id', pg.id);
-                                await w.supabase.from('audit_log').insert({
-                                  user_id: w.user?.id, tabel: 'pengiriman', aksi: 'UPDATE',
-                                  ringkasan: `Pengiriman tahap ${pg.tahap} ${w.selectedDO?.no_do || ''} BERANGKAT (${fmt(pg.jumlah_zak)} zak)`,
-                                });
-                                w.triggerToast(`Tahap ${pg.tahap} berangkat`); w.fetchAll();
-                              }}>🚚 Berangkat</button>
-                            )}
-                            {pg.status === 'jalan' && (
-                              <button className="btn btn-success btn-sm" style={{ padding: '3px 9px', fontSize: '11px' }} onClick={async () => {
-                                await w.supabase.from('pengiriman').update({ status: 'tiba', waktu_tiba: new Date().toISOString() }).eq('id', pg.id);
-                                await w.supabase.from('audit_log').insert({
-                                  user_id: w.user?.id, tabel: 'pengiriman', aksi: 'UPDATE',
-                                  ringkasan: `Pengiriman tahap ${pg.tahap} ${w.selectedDO?.no_do || ''} TIBA di toko (${fmt(pg.jumlah_zak)} zak)`,
-                                });
-                                w.triggerToast(`Tahap ${pg.tahap} tiba di toko`); w.fetchAll();
-                              }}>✅ Tiba</button>
-                            )}
-                          </div>
-                        )}
+                        <div className="flex-row" style={{ marginTop: '8px', gap: '6px' }}>
+                          {(w.user?.role === 'admin' || w.user?.role === 'superadmin') && (
+                            <button className="btn btn-ghost btn-sm" style={{ padding: '3px 9px', fontSize: '11px' }} onClick={() => w.openEditPengiriman(pg)}>✏️ Edit</button>
+                          )}
+                          {pg.status === 'persiapan' && (
+                            <button className="btn btn-sm" style={{ background: 'var(--warn)', color: '#000', padding: '3px 9px', fontSize: '11px' }} onClick={async () => {
+                              await w.supabase.from('pengiriman').update({ status: 'jalan' }).eq('id', pg.id);
+                              await w.supabase.from('audit_log').insert({
+                                user_id: w.user?.id, tabel: 'pengiriman', aksi: 'UPDATE',
+                                ringkasan: `Pengiriman tahap ${pg.tahap} ${w.selectedDO?.no_do || ''} BERANGKAT (${fmt(pg.jumlah_zak)} zak)`,
+                              });
+                              w.triggerToast(`Tahap ${pg.tahap} berangkat`); w.fetchAll();
+                            }}>🚚 Berangkat</button>
+                          )}
+                          {pg.status === 'jalan' && (
+                            <button className="btn btn-success btn-sm" style={{ padding: '3px 9px', fontSize: '11px' }} onClick={async () => {
+                              await w.supabase.from('pengiriman').update({ status: 'tiba', waktu_tiba: new Date().toISOString() }).eq('id', pg.id);
+                              await w.supabase.from('audit_log').insert({
+                                user_id: w.user?.id, tabel: 'pengiriman', aksi: 'UPDATE',
+                                ringkasan: `Pengiriman tahap ${pg.tahap} ${w.selectedDO?.no_do || ''} TIBA di toko (${fmt(pg.jumlah_zak)} zak)`,
+                              });
+                              w.triggerToast(`Tahap ${pg.tahap} tiba di toko`); w.fetchAll();
+                            }}>✅ Tiba</button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   ))}

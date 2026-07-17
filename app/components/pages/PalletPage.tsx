@@ -13,7 +13,7 @@ export default function PalletPage({ w }: Props) {
       <div className="section-header">
         <div className="section-title">Peredaran Pallet</div>
         <div className="flex-row">
-          {w.user?.role === 'admin' && (
+          {(w.user?.role === 'admin' || w.user?.role === 'superadmin') && (
             <button className="btn btn-ghost btn-sm" onClick={() => w.setModalPalletStok(true)}>⚙ Kelola Stok Pallet</button>
           )}
           <button className="btn btn-purple" onClick={() => w.setModalPallet(true)}>+ Catat Pergerakan</button>

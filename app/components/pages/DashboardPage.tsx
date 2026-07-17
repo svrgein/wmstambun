@@ -2,8 +2,8 @@
 
 import React from 'react';
 import type { UseWarehouseReturn } from '@/app/hooks/useWarehouse';
-import { fmt, fmtDate } from '@/app/lib/helpers';
-import { statusDOBadge, statusDOLabel, statusAngkutanBadge, statusAngkutanLabel } from '@/app/lib/constants';
+import { fmt, fmtTon } from '@/app/lib/helpers';
+import { statusDOBadge, statusDOLabel } from '@/app/lib/constants';
 
 interface Props {
   w: UseWarehouseReturn;
@@ -11,23 +11,49 @@ interface Props {
 
 export default function DashboardPage({ w }: Props) {
   const bal = w.getPalletBalance();
+  const masukToday = w.todayTrx.filter(t => t.jenis === 'masuk');
+  const keluarToday = w.todayTrx.filter(t => t.jenis === 'keluar');
+  const masukTodayZak = masukToday.reduce((sum, t) => sum + t.jumlah_zak, 0);
+  const keluarTodayZak = keluarToday.reduce((sum, t) => sum + t.jumlah_zak, 0);
+  const masukTodayTon = w.todayTonIn;
+  const keluarTodayTon = w.todayTonOut;
+  const categoryOrder = ['GMS', 'TMS', 'IMK'] as const;
+  const armadaStatus = categoryOrder.map(cat => {
+    const items = w.angkutanGroups?.[cat] || [];
+    const ready = items.filter(a => a.status === 'tersedia').length;
+    return { cat, total: items.length, ready };
+  });
 
   return (
     <div>
       <div className="stat-grid">
         <div className="stat-card orange"><div className="stat-label">Jenis Semen</div><div className="stat-val">{w.products.length}</div><div className="stat-sub">varian aktif</div></div>
-        <div className="stat-card blue"><div className="stat-label">Total Stok</div><div className="stat-val">{fmt(w.totalZak)}</div><div className="stat-sub">zak · {w.totalTon.toFixed(1)} ton</div></div>
+        <div className="stat-card blue"><div className="stat-label">Total Stok</div><div className="stat-val">{fmt(w.totalZak)}</div><div className="stat-sub">zak · {fmtTon(w.totalTon)} ton</div></div>
         <div className="stat-card red"><div className="stat-label">Stok Kritis</div><div className="stat-val">{w.stokRendah.length}</div><div className="stat-sub">item perlu restock</div></div>
-        <div className="stat-card green"><div className="stat-label">DO Hari Ini</div><div className="stat-val">{w.todayDO.length}</div><div className="stat-sub">surat jalan</div></div>
-        <div className="stat-card yellow"><div className="stat-label">Truk Jalan</div><div className="stat-val">{w.angkutanJalan.length}</div><div className="stat-sub">dalam perjalanan</div></div>
-        <div className="stat-card purple"><div className="stat-label">Mitra Toko</div><div className="stat-val">{w.tokos.length}</div><div className="stat-sub">toko terdaftar</div></div>
+        <div className="stat-card green"><div className="stat-label">Masuk Hari Ini</div><div className="stat-val">{masukToday.length}</div><div className="stat-sub">{fmt(masukTodayZak)} zak · {fmtTon(masukTodayTon)} ton</div></div>
+        <div className="stat-card pink"><div className="stat-label">Keluar Hari Ini</div><div className="stat-val">{keluarToday.length}</div><div className="stat-sub">{fmt(keluarTodayZak)} zak · {fmtTon(keluarTodayTon)} ton</div></div>
+        <div className="stat-card purple"><div className="stat-label">DO Hari Ini</div><div className="stat-val">{w.todayDO.length}</div><div className="stat-sub">surat jalan</div></div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '18px', marginBottom: '18px' }}>
+        {(['GMS', 'TMS', 'IMK'] as const).map(cat => {
+          const items = w.angkutanGroups?.[cat] || [];
+          const driverNames = items.map(a => a.nama_sopir).slice(0, 3);
+          return (
+            <div className="stat-card" key={cat} style={{ padding: '16px' }}>
+              <div className="stat-label">{cat}</div>
+              <div className="stat-val">{items.length}</div>
+              <div className="stat-sub">angkutan terdaftar</div>
+            </div>
+          );
+        })}
       </div>
 
       {/* Pallet ringkasan dashboard */}
       <div className="card" style={{ marginBottom: '18px' }}>
         <div className="flex-between mb-12" style={{ marginBottom: '12px' }}>
           <div className="card-title" style={{ margin: 0 }}>🟫 Posisi Pallet Saat Ini</div>
-          {w.user?.role === 'admin' && (
+          {(w.user?.role === 'admin' || w.user?.role === 'superadmin') && (
             <button className="btn btn-ghost btn-sm" onClick={() => w.setModalPalletStok(true)}>⚙ Kelola Stok Pallet</button>
           )}
         </div>
@@ -77,7 +103,7 @@ export default function DashboardPage({ w }: Props) {
                 <div key={p.id}>
                   <div className="flex-between text-sm" style={{ marginBottom: '4px' }}>
                     <span>{p.merk} — {p.nama}</span>
-                    <span className="font-bold">{tonase % 1 === 0 ? tonase : tonase.toFixed(1)} Ton ({fmt(p.stok_zak)} Zak)</span>
+                    <span className="font-bold">{fmtTon(tonase)} Ton ({fmt(p.stok_zak)} Zak)</span>
                   </div>
                   <div className="pbar-wrap">
                     <div className="pbar" style={{ width: `${pct}%`, background: p.stok_rendah ? 'var(--danger)' : 'var(--accent)' }} />
@@ -92,22 +118,21 @@ export default function DashboardPage({ w }: Props) {
         <div className="card">
           <div className="card-title">Status Armada Angkutan</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {w.angkutans.map(a => {
-              const doAktif = w.deliveryOrders.find(d => d.angkutan_id === a.id && d.status === 'proses');
-              return (
-                <div key={a.id} style={{ padding: '10px 12px', background: 'var(--surface)', borderRadius: '8px', border: '1px solid var(--border)' }}>
-                  <div className="flex-between">
-                    <div>
-                      <div className="font-bold text-sm">{a.nama_sopir}</div>
-                      <div className="text-muted text-xs">{a.no_polisi || '—'} · {fmt(a.kapasitas_zak)} zak maks</div>
-                    </div>
-                    <span className={`badge ${statusAngkutanBadge[a.status]}`}>{statusAngkutanLabel[a.status]}</span>
+            {armadaStatus.map(s => (
+              <div key={s.cat} style={{ padding: '12px 14px', background: 'var(--surface)', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                <div className="flex-between">
+                  <div>
+                    <div className="font-bold text-sm">{s.cat}</div>
+                    <div className="text-muted text-xs">{s.total} unit</div>
                   </div>
-                  {doAktif && <div style={{ marginTop: '6px', fontSize: '11.5px', color: 'var(--accent)' }}>📋 {doAktif.no_do} → {doAktif.toko?.nama}</div>}
+                  <span className={`badge ${s.ready === s.total ? 'b-green' : 'b-warning'}`}>
+                    {s.ready}/{s.total} ready
+                  </span>
                 </div>
-              );
-            })}
-            {w.angkutans.length === 0 && <div className="text-muted text-sm">Belum ada angkutan.</div>}
+              </div>
+            ))}
+            {armadaStatus.every(s => s.total === 0) && <div className="text-muted text-sm">Belum ada armada terdaftar.</div>}
+            <button className="btn btn-ghost btn-sm" style={{ width: '100%', marginTop: '4px' }} onClick={() => w.setActivePage('angkutan')}>Lihat detail sopir ↗</button>
           </div>
         </div>
       </div>

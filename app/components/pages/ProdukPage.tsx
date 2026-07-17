@@ -11,13 +11,13 @@ export default function ProdukPage({ w }: Props) {
     <div>
       <div className="section-header">
         <div className="section-title">Produk Semen ({w.products.length})</div>
-        {w.user?.role === 'admin' && (
+        {(w.user?.role === 'admin' || w.user?.role === 'superadmin') && (
           <button className="btn btn-primary" onClick={() => w.setModalProduk(true)}>+ Tambah Produk</button>
         )}
       </div>
       <div className="table-wrap">
         <table>
-          <thead><tr><th>Nama Produk</th><th>Merk</th><th>Berat/Zak</th><th>Stok (Zak)</th><th>Stok (Ton)</th><th>Min. Alert</th><th>Status</th></tr></thead>
+          <thead><tr><th>Nama Produk</th><th>Merk</th><th>Berat/Zak</th><th>Stok (Zak)</th><th>Stok (Ton)</th><th>Min. Alert</th><th>Status</th><th>Aksi</th></tr></thead>
           <tbody>
             {w.products.map(p => (
               <tr key={p.id}>
@@ -28,6 +28,11 @@ export default function ProdukPage({ w }: Props) {
                 <td className="text-blue font-bold">{p.stok_ton}</td>
                 <td>{fmt(p.stok_minimal)}</td>
                 <td><span className={`badge ${p.stok_rendah ? 'b-red' : 'b-green'}`}>{p.stok_rendah ? 'KRITIS' : 'AMAN'}</span></td>
+                <td>
+                  {(w.user?.role === 'admin' || w.user?.role === 'superadmin') && (
+                    <button className="btn btn-ghost btn-sm" onClick={() => w.openEditProduk(p)}>✏️</button>
+                  )}
+                </td>
               </tr>
             ))}
             {w.products.length === 0 && <tr className="empty-row"><td colSpan={7}>Belum ada produk.</td></tr>}

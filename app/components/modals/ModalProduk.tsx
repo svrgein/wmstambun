@@ -11,7 +11,7 @@ export default function ModalProduk({ w }: Props) {
     <div className="modal-overlay" onClick={() => w.setModalProduk(false)}>
       <div className="modal" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
-          <div className="modal-title">📦 Tambah Produk Semen</div>
+          <div className="modal-title">📦 {w.editingProduct ? 'Edit Produk' : 'Tambah Produk Semen'}</div>
           <button className="modal-close" onClick={() => w.setModalProduk(false)}>✕</button>
         </div>
         <div className="form-grid">
@@ -21,7 +21,7 @@ export default function ModalProduk({ w }: Props) {
           <div className="form-group full"><label>Stok Minimal Alert (Zak)</label><input type="number" value={w.pMinimal} onChange={e => w.setPMinimal(e.target.value)} /></div>
           <div className="form-group full"><label>Keterangan Tambahan</label><input value={w.pKet} onChange={e => w.setPKet(e.target.value)} /></div>
         </div>
-        <button className="btn btn-primary w-full" style={{ marginTop: '20px', justifyContent: 'center' }} onClick={w.saveProduk}>Simpan Produk</button>
+        <button className="btn btn-primary w-full" style={{ marginTop: '20px', justifyContent: 'center' }} onClick={w.saveProduk}>{w.editingProduct ? 'Perbarui Produk' : 'Simpan Produk'}</button>
       </div>
     </div>
   );

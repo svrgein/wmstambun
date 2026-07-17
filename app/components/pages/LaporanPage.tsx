@@ -2,7 +2,7 @@
 
 import React from 'react';
 import type { UseWarehouseReturn } from '@/app/hooks/useWarehouse';
-import { fmt, fmtDate, fmtTime } from '@/app/lib/helpers';
+import { fmt, fmtDate, fmtTime, fmtTon } from '@/app/lib/helpers';
 
 interface Props { w: UseWarehouseReturn; }
 
@@ -45,7 +45,7 @@ export default function LaporanPage({ w }: Props) {
                   <td>{t.produk?.nama}</td>
                   <td>{t.produk?.merk}</td>
                   <td className="font-bold">{fmt(t.jumlah_zak)}</td>
-                  <td className="text-blue">{ton.toFixed(2)}</td>
+                  <td className="text-blue">{fmtTon(ton)}</td>
                   <td style={{ fontFamily: 'monospace' }}>{t.no_surat || '—'}</td>
                   <td>{t.pihak || '—'}</td>
                   <td>{t.profiles?.nama || 'System'}</td>

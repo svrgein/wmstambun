@@ -9,13 +9,15 @@ interface Props { w: UseWarehouseReturn; }
 export default function ModalPengiriman({ w }: Props) {
   if (!w.modalPengiriman) return null;
   const doRef = w.deliveryOrders.find(d => d.id === w.pgDoId);
+  const selectedDeliveryOrders = [...w.deliveryOrders.filter(d => d.status === 'draft' || d.status === 'proses')];
+  if (doRef && !selectedDeliveryOrders.some(d => d.id === doRef.id)) selectedDeliveryOrders.unshift(doRef);
   const sudahDikirim = (doRef?.pengiriman || []).reduce((s, p) => s + p.jumlah_zak, 0);
   const sisa = doRef ? doRef.total_zak - sudahDikirim : 0;
   return (
     <div className="modal-overlay" onClick={() => w.setModalPengiriman(false)}>
       <div className="modal" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
-          <div className="modal-title">🗺️ Catat Tahap Pengiriman Baru</div>
+          <div className="modal-title">🗺️ {w.editingPengiriman ? 'Edit Tahap Pengiriman' : 'Catat Tahap Pengiriman Baru'}</div>
           <button className="modal-close" onClick={() => w.setModalPengiriman(false)}>✕</button>
         </div>
         <div className="form-grid">
@@ -23,10 +25,22 @@ export default function ModalPengiriman({ w }: Props) {
             <label>Pilih Surat Jalan (DO)</label>
             <select value={w.pgDoId} onChange={e => w.setPgDoId(e.target.value)}>
               <option value="">— Pilih DO Aktif —</option>
-              {w.deliveryOrders.filter(d => d.status === 'draft' || d.status === 'proses').map(d => (
+              {selectedDeliveryOrders.map(d => (
                 <option key={d.id} value={d.id}>{d.no_do} → {d.toko?.nama} (Sisa {fmt(d.total_zak - (d.pengiriman || []).reduce((s, p) => s + p.jumlah_zak, 0))} zak)</option>
               ))}
             </select>
+          </div>
+          <div className="form-group full">
+            <label>Supir / Armada Tahap</label>
+            <select value={w.pgAngkutanId} onChange={e => w.setPgAngkutanId(e.target.value)}>
+              <option value="">Gunakan sopir DO (default)</option>
+              {w.angkutans.map(a => (
+                <option key={a.id} value={a.id}>{a.nama_sopir} · {a.no_polisi || '—'} ({a.nama_angkutan})</option>
+              ))}
+            </select>
+            <div className="text-xs text-muted" style={{ marginTop: '6px' }}>
+              Pilih driver khusus untuk tahap ini jika muatan 50 zak dibagi beberapa supir.
+            </div>
           </div>
           {doRef && (
             <div className="form-group full" style={{ background: 'rgba(232,160,69,0.08)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(232,160,69,0.2)' }}>
@@ -52,10 +66,24 @@ export default function ModalPengiriman({ w }: Props) {
               }} 
             />
           </div>
-          <div className="form-group"><label>Bawa Pallet (Opsional)</label><input type="number" value={w.pgPallet} onChange={e => w.setPgPallet(e.target.value)} placeholder="0" /></div>
+          <div className="form-group">
+            <label>Jumlah Pallet (Opsional)</label>
+            <input
+              type="number"
+              value={w.pgPallet}
+              onChange={e => w.setPgPallet(e.target.value)}
+              placeholder="0"
+              disabled={w.user?.role !== 'superadmin'}
+            />
+            {w.user?.role !== 'superadmin' && (
+              <div className="text-xs text-muted" style={{ marginTop: '6px' }}>
+                Hanya superadmin yang bisa mengubah jumlah pallet di tahap ini.
+              </div>
+            )}
+          </div>
           <div className="form-group full">
             <label>Status Saat Ini</label>
-            <select value={w.pgStatus} onChange={e => w.setPgStatus(e.target.value as any)}>
+            <select value={w.pgStatus} onChange={e => w.setPgStatus(e.target.value as 'persiapan' | 'jalan' | 'tiba')}>
               <option value="persiapan">Sedang Persiapan / Muat</option>
               <option value="jalan">Truk Berangkat</option>
               <option value="tiba">Sudah Tiba di Toko</option>
