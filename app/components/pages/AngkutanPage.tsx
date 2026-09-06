@@ -88,7 +88,7 @@ export default function AngkutanPage({ w }: Props) {
           <button className="btn btn-primary" onClick={() => w.setModalAngkutan(true)}>+ Tambah Angkutan</button>
         )}
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '18px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '12px' }}>
         {(['GMS', 'TMS', 'IMK'] as const).map(cat => {
           const items = w.angkutanGroups?.[cat] || [];
           return (
@@ -97,28 +97,32 @@ export default function AngkutanPage({ w }: Props) {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 {items.length === 0 && <div className="text-muted text-sm">Belum ada angkutan {cat}.</div>}
                 {items.map(a => (
-                  <div key={a.id} style={{ padding: '12px', background: 'var(--surface)', borderRadius: '10px', border: '1px solid var(--border)' }}>
-                    <div className="flex-between" style={{ gap: '10px' }}>
+                  <div key={a.id} style={{ padding: '10px', background: 'var(--surface)', borderRadius: '10px', border: '1px solid var(--border)' }}>
+                    <div className="flex-between" style={{ gap: '8px' }}>
                       <div>
-                        <div className="font-bold">{a.nama_sopir}</div>
-                        <div className="text-xs text-muted" style={{ marginTop: '3px' }}>{a.nama_angkutan} · {a.no_polisi || '—'}</div>
+                        <div style={{ fontSize: '14px', fontWeight: 700 }}>{a.nama_sopir}</div>
+                        <div className="text-xs text-muted" style={{ marginTop: '2px' }}>{a.nama_angkutan} · {a.no_polisi || '—'}</div>
                       </div>
-                      <span className={`badge ${statusAngkutanBadge[a.status]}`}>{statusAngkutanLabel[a.status]}</span>
+                      <span className={`badge ${statusAngkutanBadge[a.status]}`} style={{ fontSize: '11px', padding: '3px 8px' }}>{statusAngkutanLabel[a.status]}</span>
                     </div>
-                    <div className="text-xs text-muted" style={{ marginTop: '10px' }}>{fmt(a.kapasitas_zak)} Zak</div>
-                    <div className="flex-row" style={{ gap: '8px', marginTop: '10px' }}>
+                    <div className="text-xs text-muted" style={{ marginTop: '7px' }}>{fmt(a.kapasitas_zak)} Zak</div>
+                    <div className="flex-row" style={{ gap: '6px', marginTop: '8px', flexWrap: 'wrap' }}>
                       {(w.user?.role === 'admin' || w.user?.role === 'superadmin') && (
                         <button
                           className="btn btn-ghost btn-sm"
                           onClick={async () => {
-                            const newStatus = a.status === 'tersedia' ? 'tidak_aktif' : 'tersedia';
-                            await w.supabase.from('angkutan').update({ status: newStatus }).eq('id', a.id);
+                            const newStatus = a.status === 'tersedia' ? 'maintenance' : 'tersedia';
+                            const { error } = await w.supabase.from('angkutan').update({ status: newStatus }).eq('id', a.id);
+                            if (error) {
+                              w.triggerToast(`Gagal ubah status: ${error.message}`, 'error');
+                              return;
+                            }
                             await w.supabase.from('audit_log').insert({
                               user_id: w.user?.id, tabel: 'angkutan', aksi: 'UPDATE',
-                              ringkasan: `Angkutan ${a.nama_sopir} (${a.nama_angkutan}) status → ${statusAngkutanLabel[newStatus]}`,
+                              ringkasan: `Status angkutan ${a.nama_sopir} (${a.nama_angkutan}) → ${statusAngkutanLabel[newStatus]}`,
                             });
                             w.triggerToast(`${a.nama_sopir} ditandai ${statusAngkutanLabel[newStatus]}`);
-                            w.fetchAll();
+                            await w.fetchAll();
                           }}
                           title="Tandai Hadir / Absen"
                           disabled={a.status === 'dalam_perjalanan'}
@@ -142,20 +146,20 @@ export default function AngkutanPage({ w }: Props) {
         })}
       </div>
       {w.angkutanGroups?.Lainnya?.length ? (
-        <div className="card" style={{ marginTop: '18px' }}>
+        <div className="card" style={{ marginTop: '12px' }}>
           <div className="card-title">Lainnya ({w.angkutanGroups.Lainnya.length})</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {w.angkutanGroups.Lainnya.map(a => (
-              <div key={a.id} style={{ padding: '12px', background: 'var(--surface)', borderRadius: '10px', border: '1px solid var(--border)' }}>
-                <div className="flex-between" style={{ gap: '10px' }}>
+              <div key={a.id} style={{ padding: '10px', background: 'var(--surface)', borderRadius: '10px', border: '1px solid var(--border)' }}>
+                <div className="flex-between" style={{ gap: '8px' }}>
                   <div>
-                    <div className="font-bold">{a.nama_sopir}</div>
-                    <div className="text-xs text-muted" style={{ marginTop: '3px' }}>{a.nama_angkutan} · {a.no_polisi || '—'}</div>
+                    <div style={{ fontSize: '14px', fontWeight: 700 }}>{a.nama_sopir}</div>
+                    <div className="text-xs text-muted" style={{ marginTop: '2px' }}>{a.nama_angkutan} · {a.no_polisi || '—'}</div>
                   </div>
-                  <span className={`badge ${statusAngkutanBadge[a.status]}`}>{statusAngkutanLabel[a.status]}</span>
+                  <span className={`badge ${statusAngkutanBadge[a.status]}`} style={{ fontSize: '11px', padding: '3px 8px' }}>{statusAngkutanLabel[a.status]}</span>
                 </div>
-                <div className="text-xs text-muted" style={{ marginTop: '10px' }}>{fmt(a.kapasitas_zak)} Zak</div>
-                <div className="flex-row" style={{ gap: '8px', marginTop: '10px' }}>
+                <div className="text-xs text-muted" style={{ marginTop: '7px' }}>{fmt(a.kapasitas_zak)} Zak</div>
+                <div className="flex-row" style={{ gap: '6px', marginTop: '8px', flexWrap: 'wrap' }}>
                   {(w.user?.role === 'admin' || w.user?.role === 'superadmin') && (
                     <button className="btn btn-ghost btn-sm" onClick={() => w.openEditAngkutan(a)}>✏️</button>
                   )}

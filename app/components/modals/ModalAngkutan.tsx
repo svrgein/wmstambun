@@ -21,7 +21,10 @@ export default function ModalAngkutan({ w }: Props) {
           <div className="form-group"><label>Kapasitas Muat (Zak)</label><input type="number" value={w.aKapasitas} onChange={e => w.setAKapasitas(e.target.value)} /></div>
           <div className="form-group full">
             <label>Status Saat Ini</label>
-            <select value={w.aStatus} onChange={e => w.setAStatus(e.target.value as any)}>
+            <select value={w.aStatus} onChange={e => w.setAStatus(e.target.value as 'tersedia' | 'dalam_perjalanan' | 'maintenance' | 'tidak_aktif')}>
+              {!['tersedia', 'dalam_perjalanan', 'maintenance'].includes(w.aStatus) && (
+                <option value={w.aStatus} disabled>{w.aStatus}</option>
+              )}
               <option value="tersedia">Tersedia</option>
               <option value="dalam_perjalanan">Dalam Perjalanan (DO)</option>
               <option value="maintenance">Maintenance / Rusak</option>

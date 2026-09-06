@@ -164,8 +164,48 @@ export const CSS = `
   .live-dot { width: 7px; height: 7px; background: var(--success); border-radius: 50%; display: inline-block; animation: pulse 2s infinite; margin-right: 5px; }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.35} }
 
-  .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; gap: 16px; }
   .section-title  { font-size: 14px; font-weight: 700; }
+  .section-subtitle { font-size: 12.5px; color: var(--muted); margin-top: 4px; }
+
+  .note-filters { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 18px; }
+  .filter-pill { min-width: max-content; border-color: transparent; color: var(--muted); transition: background 0.2s, color 0.2s, border-color 0.2s; }
+  .filter-pill.active { background: rgba(255,255,255,0.08); color: var(--text); border-color: var(--border); }
+
+  .note-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 18px; }
+  .note-card { position: relative; background: var(--surface); border: 1px solid var(--border); border-radius: 18px; overflow: hidden; box-shadow: 0 18px 45px rgba(0,0,0,0.04); display: flex; flex-direction: column; }
+  .note-card-strip { width: 100%; height: 6px; }
+  .note-card-content { position: relative; padding: 20px 20px 18px 18px; display: flex; flex-direction: column; min-height: 340px; }
+  .note-card-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+  .note-card-title { font-size: 15px; font-weight: 800; line-height: 1.2; color: var(--text); }
+  .note-card-tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .note-badge { display: inline-flex; align-items: center; gap: 6px; padding: 6px 11px; border-radius: 999px; font-size: 11px; font-weight: 700; white-space: nowrap; background: rgba(255,255,255,0.92); color: var(--text); }
+  .note-tag { display: inline-flex; align-items: center; padding: 5px 10px; border-radius: 999px; font-size: 11px; color: var(--muted); background: rgba(0,0,0,0.05); }
+  .note-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+  .note-card-body { color: var(--text-sub); font-size: 13px; line-height: 1.7; white-space: pre-wrap; min-height: 90px; }
+  .note-meta { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; font-size: 11px; color: var(--muted); align-items: center; }
+  .note-comments { display: grid; gap: 10px; }
+  .comment-item { background: rgba(255,255,255,0.8); border-radius: 14px; padding: 12px 14px; border: 1px solid rgba(0,0,0,0.04); }
+  .comment-author { font-size: 12px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+  .comment-body { font-size: 12px; line-height: 1.5; white-space: pre-wrap; color: var(--text-sub); }
+  .comment-meta { margin-top: 8px; font-size: 10px; color: var(--muted); }
+  .note-comment-input { display: flex; gap: 10px; align-items: flex-end; margin-top: auto; }
+  .comment-input { min-height: 38px; max-height: 96px; border-radius: 12px; border: 1px solid var(--border); background: var(--card); padding: 10px 12px; color: var(--text); font-size: 13px; resize: vertical; width: 100%; }
+  .note-empty-state { padding: 32px 18px; text-align: center; color: var(--muted); border: 1px dashed var(--border); border-radius: 16px; background: var(--card); }
+
+  .chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 18px; }
+  .chart-card-title { font-size: 14px; font-weight: 700; margin-bottom: 8px; }
+  .chart-legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: var(--muted); margin-bottom: 14px; }
+  .chart-legend span { display: inline-flex; align-items: center; gap: 8px; }
+  .chart-legend-dot { width: 10px; height: 10px; border-radius: 999px; display: inline-block; }
+  .chart-area { display: grid; gap: 12px; }
+  .chart-row { display: grid; grid-template-columns: minmax(120px, 1fr) 4fr; gap: 12px; align-items: center; }
+  .chart-label { font-size: 12px; color: var(--muted); }
+  .chart-bars { display: grid; gap: 8px; }
+  .chart-bar-group { display: grid; gap: 6px; }
+  .chart-bar-track { background: rgba(255,255,255,0.08); border-radius: 999px; height: 12px; overflow: hidden; }
+  .chart-bar { height: 100%; border-radius: 999px; }
+  .chart-bar-meta { font-size: 11px; color: var(--muted); }
 
   .tabs { display: flex; gap: 4px; background: var(--surface); border-radius: 8px; padding: 3px; border: 1px solid var(--border); margin-bottom: 18px; }
   .tab { padding: 7px 14px; border-radius: 6px; font-size: 12.5px; font-weight: 600; cursor: pointer; border: none; background: none; color: var(--muted); }
@@ -187,6 +227,60 @@ export const CSS = `
   /* Pallet balance bar */
   .balance-row { display: flex; height: 12px; border-radius: 6px; overflow: hidden; gap: 2px; margin: 8px 0 4px; }
   .balance-seg { height: 100%; border-radius: 3px; transition: width 0.4s; }
+
+  /* --- NEW DASHBOARD STYLES --- */
+  .dash-header { margin-bottom: 24px; }
+  .dash-title { font-size: 28px; font-weight: 700; color: var(--text); letter-spacing: -0.02em; margin-bottom: 4px; }
+  .dash-subtitle { font-size: 14px; color: var(--muted); }
+
+  .dash-grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 20px; }
+  .dash-card-stat { background: var(--card); border: 1px solid var(--border); border-radius: 20px; padding: 20px; display: flex; flex-direction: column; position: relative; }
+  .dash-card-stat.primary { background: #116c4c; border-color: #116c4c; color: #fff; }
+  .dash-card-stat.primary .stat-title, .dash-card-stat.primary .stat-sub { color: rgba(255,255,255,0.8); }
+  .dash-card-stat.primary .stat-val { color: #fff; }
+  .dash-card-stat .stat-title { font-size: 14px; font-weight: 600; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
+  .dash-card-stat .stat-val { font-size: 36px; font-weight: 700; line-height: 1.1; margin-bottom: 8px; }
+  .dash-card-stat .stat-sub { font-size: 12px; color: var(--muted); font-weight: 500; display: flex; align-items: center; gap: 4px; }
+  .dash-icon-circle { width: 32px; height: 32px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.1); display: flex; align-items: center; justify-content: center; font-size: 14px; }
+  .dash-card-stat.primary .dash-icon-circle { border-color: rgba(255,255,255,0.3); }
+
+  .dash-grid-bento { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; margin-bottom: 20px; }
+  .dash-grid-bento-bottom { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
+  
+  .dash-panel { background: var(--card); border: 1px solid var(--border); border-radius: 20px; padding: 24px; display: flex; flex-direction: column; }
+  .dash-panel-title { font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
+  
+  .dash-bar-chart { display: flex; align-items: flex-end; gap: 12px; height: 160px; margin-top: auto; padding-top: 20px; }
+  .dash-bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 8px; justify-content: flex-end; height: 100%; }
+  .dash-bar-fill { width: 100%; max-width: 48px; border-radius: 24px; transition: height 0.5s ease; position: relative; }
+  .dash-bar-fill.striped { background: repeating-linear-gradient( 45deg, transparent, transparent 4px, rgba(17, 108, 76, 0.2) 4px, rgba(17, 108, 76, 0.2) 8px ); border: 2px solid rgba(17, 108, 76, 0.2); }
+  .dash-bar-fill.solid { background: #116c4c; }
+  .dash-bar-fill.light { background: #4caf7d; }
+  .dash-bar-label { font-size: 12px; font-weight: 600; color: var(--muted); }
+
+  .dash-list-item { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+  .dash-list-item:last-child { border-bottom: none; padding-bottom: 0; }
+  .dash-avatar { width: 36px; height: 36px; border-radius: 50%; background: #f0fdf4; color: #116c4c; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; }
+  .dash-list-info { flex: 1; }
+  .dash-list-title { font-size: 14px; font-weight: 600; color: var(--text); }
+  .dash-list-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .dash-badge { padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+  .dash-badge.green { background: #f0fdf4; color: #116c4c; }
+  .dash-badge.yellow { background: #fefce8; color: #b45309; }
+
+  .dash-doughnut { position: relative; width: 140px; height: 140px; margin: 0 auto; }
+  .dash-doughnut-svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+  .dash-doughnut-bg { fill: none; stroke: var(--border); stroke-width: 12; }
+  .dash-doughnut-val { fill: none; stroke: #116c4c; stroke-width: 12; stroke-linecap: round; stroke-dasharray: 283; transition: stroke-dashoffset 1s ease; }
+  .dash-doughnut-text { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .dash-doughnut-pct { font-size: 32px; font-weight: 700; color: var(--text); line-height: 1; }
+  .dash-doughnut-lbl { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+  @media (max-width: 1100px) {
+    .dash-grid-4 { grid-template-columns: repeat(2, 1fr); }
+    .dash-grid-bento { grid-template-columns: 1fr; }
+    .dash-grid-bento-bottom { grid-template-columns: 1fr; }
+  }
 
   @media print {
     .sidebar,.topbar,.btn,.card-title,input,select { display: none !important; }

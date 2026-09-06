@@ -17,6 +17,7 @@ export default function DashboardPage({ w }: Props) {
   const keluarTodayZak = keluarToday.reduce((sum, t) => sum + t.jumlah_zak, 0);
   const masukTodayTon = w.todayTonIn;
   const keluarTodayTon = w.todayTonOut;
+  
   const categoryOrder = ['GMS', 'TMS', 'IMK'] as const;
   const armadaStatus = categoryOrder.map(cat => {
     const items = w.angkutanGroups?.[cat] || [];
@@ -24,168 +25,217 @@ export default function DashboardPage({ w }: Props) {
     return { cat, total: items.length, ready };
   });
 
+  const totalPallet = bal.total || 1;
+
+  // Active DOs for Kiriman Bertahap (Processing or Draft today)
+  const todayStr = new Date().toLocaleDateString('en-CA'); // Gets YYYY-MM-DD in local time
+  const activeDOs = w.deliveryOrders.filter(d => d.status === 'proses' || (d.status === 'draft' && d.tanggal.startsWith(todayStr))).slice(0, 5);
+
   return (
     <div>
-      <div className="stat-grid">
-        <div className="stat-card orange"><div className="stat-label">Jenis Semen</div><div className="stat-val">{w.products.length}</div><div className="stat-sub">varian aktif</div></div>
-        <div className="stat-card blue"><div className="stat-label">Total Stok</div><div className="stat-val">{fmt(w.totalZak)}</div><div className="stat-sub">zak · {fmtTon(w.totalTon)} ton</div></div>
-        <div className="stat-card red"><div className="stat-label">Stok Kritis</div><div className="stat-val">{w.stokRendah.length}</div><div className="stat-sub">item perlu restock</div></div>
-        <div className="stat-card green"><div className="stat-label">Masuk Hari Ini</div><div className="stat-val">{masukToday.length}</div><div className="stat-sub">{fmt(masukTodayZak)} zak · {fmtTon(masukTodayTon)} ton</div></div>
-        <div className="stat-card pink"><div className="stat-label">Keluar Hari Ini</div><div className="stat-val">{keluarToday.length}</div><div className="stat-sub">{fmt(keluarTodayZak)} zak · {fmtTon(keluarTodayTon)} ton</div></div>
-        <div className="stat-card purple"><div className="stat-label">DO Hari Ini</div><div className="stat-val">{w.todayDO.length}</div><div className="stat-sub">surat jalan</div></div>
+      <div className="dash-header">
+        <h1 className="dash-title">Dashboard</h1>
+        <p className="dash-subtitle">Ringkasan operasional gudang hari ini.</p>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '18px', marginBottom: '18px' }}>
-        {(['GMS', 'TMS', 'IMK'] as const).map(cat => {
-          const items = w.angkutanGroups?.[cat] || [];
-          const driverNames = items.map(a => a.nama_sopir).slice(0, 3);
-          return (
-            <div className="stat-card" key={cat} style={{ padding: '16px' }}>
-              <div className="stat-label">{cat}</div>
-              <div className="stat-val">{items.length}</div>
-              <div className="stat-sub">angkutan terdaftar</div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Pallet ringkasan dashboard */}
-      <div className="card" style={{ marginBottom: '18px' }}>
-        <div className="flex-between mb-12" style={{ marginBottom: '12px' }}>
-          <div className="card-title" style={{ margin: 0 }}>🟫 Posisi Pallet Saat Ini</div>
-          {(w.user?.role === 'admin' || w.user?.role === 'superadmin') && (
-            <button className="btn btn-ghost btn-sm" onClick={() => w.setModalPalletStok(true)}>⚙ Kelola Stok Pallet</button>
-          )}
+      <div className="dash-grid-4">
+        <div className="dash-card-stat primary">
+          <div className="stat-title">
+            <span>Total Stok</span>
+            <div className="dash-icon-circle">📦</div>
+          </div>
+          <div className="stat-val">{fmt(w.totalZak)}</div>
+          <div className="stat-sub">
+            <span style={{background: 'rgba(255,255,255,0.2)', padding: '2px 6px', borderRadius: '4px'}}>{w.products.length} Varian</span>
+            {fmtTon(w.totalTon)} Tonase
+          </div>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '10px', marginBottom: '14px' }}>
-          {[
-            { label: 'Total Pallet', val: bal.total, color: 'var(--text)', sub: 'keseluruhan' },
-            { label: 'Gudang (Kosong)', val: bal.kosong, color: 'var(--success)', sub: 'siap pakai' },
-            { label: 'Gudang (Isi Semen)', val: bal.isi, color: 'var(--accent2)', sub: 'sudah disiapkan' },
-            { label: 'Di Angkutan', val: bal.angkutan, color: 'var(--warn)', sub: 'dibawa truk' },
-            { label: 'Di Toko', val: bal.toko, color: 'var(--accent3)', sub: 'deposit mitra' },
-          ].map(({ label, val, color, sub }) => (
-            <div key={label} style={{ background: 'var(--surface)', borderRadius: '8px', padding: '12px 14px', border: '1px solid var(--border)' }}>
-              <div className="text-xs text-muted">{label}</div>
-              <div style={{ fontSize: '24px', fontWeight: 800, color, margin: '4px 0 2px' }}>{val}</div>
-              <div className="text-xs text-muted">{sub}</div>
-            </div>
-          ))}
+
+        <div className="dash-card-stat">
+          <div className="stat-title">
+            <span>DO Aktif</span>
+            <div className="dash-icon-circle">📋</div>
+          </div>
+          <div className="stat-val">{activeDOs.length}</div>
+          <div className="stat-sub">
+            <span style={{background: 'rgba(17,108,76,0.1)', color: '#116c4c', padding: '2px 6px', borderRadius: '4px'}}>Surat Jalan / Proses</span>
+          </div>
         </div>
-        {bal.total > 0 && (
-          <>
-            <div className="balance-row">
-              {bal.kosong > 0 && <div className="balance-seg" style={{ width: `${(bal.kosong / bal.total) * 100}%`, background: 'var(--success)' }} />}
-              {bal.isi > 0 && <div className="balance-seg" style={{ width: `${(bal.isi / bal.total) * 100}%`, background: 'var(--accent2)' }} />}
-              {bal.angkutan > 0 && <div className="balance-seg" style={{ width: `${(bal.angkutan / bal.total) * 100}%`, background: 'var(--warn)' }} />}
-              {bal.toko > 0 && <div className="balance-seg" style={{ width: `${(bal.toko / bal.total) * 100}%`, background: 'var(--accent3)' }} />}
-            </div>
-            <div style={{ display: 'flex', gap: '14px', fontSize: '11px', color: 'var(--muted)', flexWrap: 'wrap' }}>
-              <span style={{ color: 'var(--success)' }}>■ Gudang kosong ({bal.kosong})</span>
-              <span style={{ color: 'var(--accent2)' }}>■ Gudang isi ({bal.isi})</span>
-              <span style={{ color: 'var(--warn)' }}>■ Angkutan ({bal.angkutan})</span>
-              <span style={{ color: 'var(--accent3)' }}>■ Toko ({bal.toko})</span>
-              {bal.selisih !== 0 && <span style={{ color: 'var(--danger)', fontWeight: 700 }}>⚠️ Selisih: {bal.selisih}</span>}
-            </div>
-          </>
-        )}
+
+        <div className="dash-card-stat">
+          <div className="stat-title">
+            <span>Barang Masuk</span>
+            <div className="dash-icon-circle">⬇️</div>
+          </div>
+          <div className="stat-val">{masukToday.length}</div>
+          <div className="stat-sub">
+            <span style={{background: 'rgba(17,108,76,0.1)', color: '#116c4c', padding: '2px 6px', borderRadius: '4px'}}>{fmt(masukTodayZak)} Zak</span>
+            <span style={{color: 'var(--muted)', marginLeft: '4px'}}>{fmtTon(masukTodayTon)} Ton</span>
+          </div>
+        </div>
+
+        <div className="dash-card-stat">
+          <div className="stat-title">
+            <span>Barang Keluar</span>
+            <div className="dash-icon-circle">⬆️</div>
+          </div>
+          <div className="stat-val">{keluarToday.length}</div>
+          <div className="stat-sub">
+            <span style={{background: 'rgba(17,108,76,0.1)', color: '#116c4c', padding: '2px 6px', borderRadius: '4px'}}>{fmt(keluarTodayZak)} Zak</span>
+            <span style={{color: 'var(--muted)', marginLeft: '4px'}}>{fmtTon(keluarTodayTon)} Ton</span>
+          </div>
+        </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '18px', marginBottom: '18px' }}>
-        {/* Kapasitas stok */}
-        <div className="card">
-          <div className="card-title">Kapasitas Stok per Jenis</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '11px' }}>
+      <div className="dash-grid-bento">
+        {/* Detail Stok Semen */}
+        <div className="dash-panel">
+          <div className="dash-panel-title">Rincian Stok Semen</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             {w.products.map(p => {
-              const pct = Math.min((p.stok_zak / 600) * 100, 100);
+              const maxCap = 600; 
+              const pct = Math.min((p.stok_zak / maxCap) * 100, 100);
               const tonase = (p.stok_zak * p.berat_per_zak) / 1000;
+              
               return (
-                <div key={p.id}>
-                  <div className="flex-between text-sm" style={{ marginBottom: '4px' }}>
-                    <span>{p.merk} — {p.nama}</span>
-                    <span className="font-bold">{fmtTon(tonase)} Ton ({fmt(p.stok_zak)} Zak)</span>
+                <div key={p.id} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '14px', fontWeight: 600, color: p.stok_rendah ? 'var(--danger)' : 'var(--text)' }}>
+                        {p.merk} {p.nama}
+                      </span>
+                      {p.stok_rendah && <span className="dash-badge" style={{ background: 'var(--danger)', color: '#fff' }}>Stok Kritis</span>}
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <span style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text)' }}>{fmt(p.stok_zak)} Zak</span>
+                      <span style={{ fontSize: '12px', color: 'var(--muted)', marginLeft: '6px' }}>({fmtTon(tonase)} Ton)</span>
+                    </div>
                   </div>
-                  <div className="pbar-wrap">
-                    <div className="pbar" style={{ width: `${pct}%`, background: p.stok_rendah ? 'var(--danger)' : 'var(--accent)' }} />
+                  <div className="pbar-wrap" style={{ height: '8px', background: 'var(--border)' }}>
+                    <div className="pbar" style={{ width: `${pct}%`, background: p.stok_rendah ? 'var(--danger)' : '#116c4c' }} />
                   </div>
                 </div>
               );
             })}
-            {w.products.length === 0 && <div className="text-muted text-sm">Belum ada produk.</div>}
+            {w.products.length === 0 && <div className="text-muted" style={{textAlign: 'center', padding: '20px 0'}}>Belum ada produk semen.</div>}
           </div>
         </div>
-        {/* Armada */}
-        <div className="card">
-          <div className="card-title">Status Armada Angkutan</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {armadaStatus.map(s => (
-              <div key={s.cat} style={{ padding: '12px 14px', background: 'var(--surface)', borderRadius: '8px', border: '1px solid var(--border)' }}>
-                <div className="flex-between">
-                  <div>
-                    <div className="font-bold text-sm">{s.cat}</div>
-                    <div className="text-muted text-xs">{s.total} unit</div>
+
+        {/* Detail Pallet */}
+        <div className="dash-panel">
+          <div className="dash-panel-title">
+            Detail Posisi Pallet
+            {(w.user?.role === 'admin' || w.user?.role === 'superadmin') && (
+              <button className="btn btn-ghost btn-sm" style={{borderRadius: '20px'}} onClick={() => w.setModalPalletStok(true)}>Kelola</button>
+            )}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ textAlign: 'center', marginBottom: '8px' }}>
+              <div style={{ fontSize: '13px', color: 'var(--muted)' }}>Total Pallet Terdaftar</div>
+              <div style={{ fontSize: '36px', fontWeight: 800, color: 'var(--text)', lineHeight: 1.2 }}>{fmt(bal.total)}</div>
+            </div>
+            
+            <div className="balance-row" style={{ height: '14px', borderRadius: '7px' }}>
+              {bal.kosong > 0 && <div className="balance-seg" style={{ width: `${(bal.kosong / totalPallet) * 100}%`, background: '#116c4c' }} title={`Gudang Kosong: ${bal.kosong}`} />}
+              {bal.isi > 0 && <div className="balance-seg" style={{ width: `${(bal.isi / totalPallet) * 100}%`, background: '#3b82f6' }} title={`Gudang Isi: ${bal.isi}`} />}
+              {bal.angkutan > 0 && <div className="balance-seg" style={{ width: `${(bal.angkutan / totalPallet) * 100}%`, background: '#f59e0b' }} title={`Di Angkutan: ${bal.angkutan}`} />}
+              {bal.toko > 0 && <div className="balance-seg" style={{ width: `${(bal.toko / totalPallet) * 100}%`, background: '#8b5cf6' }} title={`Di Toko: ${bal.toko}`} />}
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div style={{ background: 'var(--surface)', padding: '12px', borderRadius: '12px', border: '1px solid var(--border)' }}>
+                <div style={{ fontSize: '11px', color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{width: 8, height: 8, borderRadius: '50%', background: '#116c4c'}}></span> Gudang (Kosong)</div>
+                <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text)', marginTop: '4px' }}>{fmt(bal.kosong)}</div>
+              </div>
+              <div style={{ background: 'var(--surface)', padding: '12px', borderRadius: '12px', border: '1px solid var(--border)' }}>
+                <div style={{ fontSize: '11px', color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{width: 8, height: 8, borderRadius: '50%', background: '#3b82f6'}}></span> Gudang (Isi Semen)</div>
+                <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text)', marginTop: '4px' }}>{fmt(bal.isi)}</div>
+              </div>
+              <div style={{ background: 'var(--surface)', padding: '12px', borderRadius: '12px', border: '1px solid var(--border)' }}>
+                <div style={{ fontSize: '11px', color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{width: 8, height: 8, borderRadius: '50%', background: '#f59e0b'}}></span> Di Angkutan</div>
+                <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text)', marginTop: '4px' }}>{fmt(bal.angkutan)}</div>
+              </div>
+              <div style={{ background: 'var(--surface)', padding: '12px', borderRadius: '12px', border: '1px solid var(--border)' }}>
+                <div style={{ fontSize: '11px', color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{width: 8, height: 8, borderRadius: '50%', background: '#8b5cf6'}}></span> Deposit Toko</div>
+                <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text)', marginTop: '4px' }}>{fmt(bal.toko)}</div>
+              </div>
+            </div>
+            {bal.selisih !== 0 && (
+              <div style={{ background: 'rgba(224,82,82,0.1)', color: 'var(--danger)', padding: '10px', borderRadius: '8px', fontSize: '12px', fontWeight: 600, textAlign: 'center' }}>
+                ⚠️ Terdapat selisih pallet: {bal.selisih}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="dash-grid-bento">
+        {/* DO & Kiriman Bertahap */}
+        <div className="dash-panel">
+          <div className="dash-panel-title">
+            Status DO & Pengiriman Bertahap
+            <button className="btn btn-primary btn-sm" style={{ borderRadius: '20px' }} onClick={() => w.setActivePage('pengiriman')}>Detail Pengiriman</button>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            {activeDOs.length === 0 ? (
+              <div style={{ padding: '24px 0', textAlign: 'center', color: 'var(--muted)' }}>Tidak ada DO aktif / proses saat ini.</div>
+            ) : (
+              activeDOs.map(d => {
+                const terkirim = d.pengiriman?.reduce((s, p) => s + p.jumlah_zak, 0) || 0;
+                const progress = d.total_zak > 0 ? (terkirim / d.total_zak) * 100 : 0;
+                
+                return (
+                  <div key={d.id} style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '16px 0', borderBottom: '1px solid var(--border)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div>
+                        <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          {d.no_do}
+                          <span className={`dash-badge ${statusDOBadge[d.status] === 'b-green' ? 'green' : 'yellow'}`}>{statusDOLabel[d.status]}</span>
+                        </div>
+                        <div style={{ fontSize: '13px', color: 'var(--muted)', marginTop: '4px' }}>{d.toko?.nama || 'Tanpa Toko'} — {d.angkutan?.nama_sopir || 'Tanpa Angkutan'}</div>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text)' }}>{fmt(terkirim)} / {fmt(d.total_zak)} Zak</div>
+                        <div style={{ fontSize: '11px', color: 'var(--muted)' }}>Terkirim</div>
+                      </div>
+                    </div>
+                    <div className="pbar-wrap" style={{ height: '6px', background: 'var(--surface)' }}>
+                      <div className="pbar" style={{ width: `${progress}%`, background: progress >= 100 ? '#116c4c' : '#f59e0b' }} />
+                    </div>
                   </div>
-                  <span className={`badge ${s.ready === s.total ? 'b-green' : 'b-warning'}`}>
-                    {s.ready}/{s.total} ready
-                  </span>
+                );
+              })
+            )}
+          </div>
+        </div>
+
+        {/* Armada Status */}
+        <div className="dash-panel">
+          <div className="dash-panel-title">
+            Kesiapan Armada
+            <button className="btn btn-ghost btn-sm" style={{ borderRadius: '20px' }} onClick={() => w.setActivePage('angkutan')}>Lihat Sopir</button>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            {armadaStatus.map((s, i) => (
+              <div key={s.cat} className="dash-list-item">
+                <div className="dash-avatar" style={{ background: i===0 ? '#f0fdf4' : (i===1 ? '#fefce8' : '#eff6ff'), color: i===0 ? '#116c4c' : (i===1 ? '#b45309' : '#1d4ed8') }}>
+                  {s.cat[0]}
                 </div>
+                <div className="dash-list-info">
+                  <div className="dash-list-title">Grup {s.cat}</div>
+                  <div className="dash-list-sub">{s.total} Truk Terdaftar</div>
+                </div>
+                <span className={`dash-badge ${s.ready === s.total && s.total > 0 ? 'green' : 'yellow'}`}>
+                  {s.ready}/{s.total} Ready
+                </span>
               </div>
             ))}
-            {armadaStatus.every(s => s.total === 0) && <div className="text-muted text-sm">Belum ada armada terdaftar.</div>}
-            <button className="btn btn-ghost btn-sm" style={{ width: '100%', marginTop: '4px' }} onClick={() => w.setActivePage('angkutan')}>Lihat detail sopir ↗</button>
+            {armadaStatus.every(s => s.total === 0) && <div className="text-muted text-sm" style={{padding: '12px 0'}}>Belum ada armada.</div>}
           </div>
         </div>
-      </div>
 
-      {/* DO hari ini */}
-      <div className="card" style={{ marginBottom: '18px' }}>
-        <div className="flex-between mb-12" style={{ marginBottom: '12px' }}>
-          <div className="card-title" style={{ margin: 0 }}>DO Hari Ini</div>
-          <button className="btn btn-primary btn-sm" onClick={() => w.setModalDO(true)}>+ Buat DO</button>
-        </div>
-        {w.todayDO.length === 0
-          ? <div className="text-muted text-sm">Belum ada DO hari ini.</div>
-          : (
-            <div className="table-wrap" style={{ border: 'none' }}>
-              <table>
-                <thead><tr><th>No DO</th><th>Toko</th><th>Angkutan</th><th>Total</th><th>Status</th></tr></thead>
-                <tbody>
-                  {w.todayDO.map(d => (
-                    <tr key={d.id} style={{ cursor: 'pointer' }} onClick={() => { w.setSelectedDO(d); w.setActivePage('do'); }}>
-                      <td className="font-bold text-accent">{d.no_do}</td>
-                      <td>{d.toko?.nama || '—'}</td>
-                      <td>{d.angkutan?.nama_sopir || '—'}</td>
-                      <td>{fmt(d.total_zak)} zak</td>
-                      <td><span className={`badge ${statusDOBadge[d.status]}`}>{statusDOLabel[d.status]}</span></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )
-        }
       </div>
-
-      {w.stokRendah.length > 0 && (
-        <div className="card">
-          <div className="card-title" style={{ color: 'var(--danger)' }}>🚨 Alert Stok Kritis</div>
-          <div className="table-wrap" style={{ border: 'none' }}>
-            <table>
-              <thead><tr><th>Produk</th><th>Stok</th><th>Minimal</th><th>Aksi</th></tr></thead>
-              <tbody>
-                {w.stokRendah.map(p => (
-                  <tr key={p.id}>
-                    <td>{p.merk} — {p.nama}</td>
-                    <td className="font-bold text-danger">{fmt(p.stok_zak)} Zak</td>
-                    <td>{fmt(p.stok_minimal)} Zak</td>
-                    <td><button className="btn btn-blue btn-sm" onClick={() => { w.setMasukId(p.id); w.setActivePage('masuk'); }}>Restock ⬇️</button></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
+

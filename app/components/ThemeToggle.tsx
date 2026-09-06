@@ -5,17 +5,18 @@ import { useEffect, useState } from 'react';
 export default function ThemeToggle() {
     const [theme, setTheme] = useState<'light' | 'dark'>('light');
 
-    useEffect(() => {
-        const saved = localStorage.getItem('theme') as 'light' | 'dark' | null;
-        const preferred = saved ?? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-        apply(preferred);
-        setTheme(preferred);
-    }, []);
-
     const apply = (t: 'light' | 'dark') => {
         document.documentElement.setAttribute('data-theme', t);
         localStorage.setItem('theme', t);
     };
+
+    useEffect(() => {
+        const saved = localStorage.getItem('theme') as 'light' | 'dark' | null;
+        const preferred = saved ?? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        apply(preferred);
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setTheme(preferred);
+    }, []);
 
     const toggle = () => {
         const next = theme === 'light' ? 'dark' : 'light';
@@ -28,8 +29,8 @@ export default function ThemeToggle() {
             onClick={toggle}
             style={{
                 position: 'fixed',
-                top: '4px',
-                right: '10%',
+                top: '5px',
+                right: '30%',
                 background: 'var(--surface)',
                 border: '1px solid var(--border)',
                 borderRadius: '8px',

@@ -84,7 +84,7 @@ export default function PalletPage({ w }: Props) {
           </>
         ) : (
           <div className="alert alert-warn" style={{ marginTop: '8px' }}>
-            Stok pallet belum diisi. Klik "Kelola Stok Pallet" untuk mengisi data awal.
+            Stok pallet belum diisi. Klik &quot;Kelola Stok Pallet&quot; untuk mengisi data awal.
           </div>
         )}
       </div>

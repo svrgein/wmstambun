@@ -39,7 +39,7 @@ export default function ModalPengiriman({ w }: Props) {
               ))}
             </select>
             <div className="text-xs text-muted" style={{ marginTop: '6px' }}>
-              Pilih driver khusus untuk tahap ini jika muatan 50 zak dibagi beberapa supir.
+              Jika tahap ini dikirim dengan supir berbeda dari DO utama, pilih supir khusus di sini.
             </div>
           </div>
           {doRef && (

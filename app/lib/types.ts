@@ -125,8 +125,8 @@ export interface AuditLog {
   aksi: string;
   record_id: string;
   ringkasan: string;
-  data_lama: any;
-  data_baru: any;
+  data_lama: unknown;
+  data_baru: unknown;
   created_at: string;
   profiles?: { nama: string };
 }

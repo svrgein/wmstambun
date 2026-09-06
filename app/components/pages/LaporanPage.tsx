@@ -3,10 +3,49 @@
 import React from 'react';
 import type { UseWarehouseReturn } from '@/app/hooks/useWarehouse';
 import { fmt, fmtDate, fmtTime, fmtTon } from '@/app/lib/helpers';
+import { Download } from 'lucide-react';
 
 interface Props { w: UseWarehouseReturn; }
 
 export default function LaporanPage({ w }: Props) {
+  const handleExportExcel = () => {
+    // 1. Siapkan header kolom yang rapi (tanpa ID/UUID database)
+    const headers = ['Tanggal', 'Waktu', 'Jenis', 'Produk', 'Merk', 'Zak', 'Tonase', 'No. Surat', 'Mitra / Customer', 'Petugas', 'Keterangan'];
+    
+    // 2. Format baris data agar hanya memuat nama yang mudah dibaca, bukan ID
+    const rows = w.filteredTrx.map(t => {
+      const berat = t.produk?.berat_per_zak || 50;
+      const ton = (t.jumlah_zak * berat) / 1000;
+      
+      return [
+        fmtDate(t.tanggal),
+        fmtTime(t.tanggal),
+        t.jenis.toUpperCase(),
+        `"${t.produk?.nama || ''}"`, // Pakai kutip ganda untuk antisipasi koma di teks
+        `"${t.produk?.merk || ''}"`,
+        t.jumlah_zak,
+        ton,
+        `"${t.no_surat || ''}"`,
+        `"${t.pihak || ''}"`,
+        `"${t.profiles?.nama || 'System'}"`,
+        `"${t.keterangan || ''}"`
+      ].join(','); // Gabungkan dengan koma untuk format CSV
+    });
+
+    // 3. Gabungkan header dan data
+    const csvContent = [headers.join(','), ...rows].join('\n');
+
+    // 4. Proses download file Excel (CSV)
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `Laporan_Transaksi_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div>
       <div className="card" style={{ marginBottom: '18px', padding: '14px 18px' }}>
@@ -29,6 +68,9 @@ export default function LaporanPage({ w }: Props) {
             </select>
           </div>
           <button className="btn btn-ghost" onClick={() => window.print()}>🖨️ Cetak</button>
+          <button className="btn btn-success" style={{ display: 'flex', alignItems: 'center', gap: '6px' }} onClick={handleExportExcel}>
+            <Download size={16} /> Export Excel
+          </button>
         </div>
       </div>
       <div className="table-wrap">

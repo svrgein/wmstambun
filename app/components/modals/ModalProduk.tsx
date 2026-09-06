@@ -18,9 +18,13 @@ export default function ModalProduk({ w }: Props) {
           <div className="form-group full"><label>Nama Varian (Cth: Portland Composite)</label><input value={w.pNama} onChange={e => w.setPNama(e.target.value)} /></div>
           <div className="form-group"><label>Merk (Cth: Tiga Roda)</label><input value={w.pMerk} onChange={e => w.setPMerk(e.target.value)} /></div>
           <div className="form-group"><label>Berat per Zak (Kg)</label><input type="number" value={w.pBerat} onChange={e => w.setPBerat(e.target.value)} /></div>
+          <div className="form-group"><label>Stok (Zak)</label><input type="number" value={w.pStok} onChange={e => w.setPStok(e.target.value)} disabled={w.user?.role !== 'superadmin'} placeholder={w.editingProduct?.stok_zak?.toString() || '0'} /></div>
           <div className="form-group full"><label>Stok Minimal Alert (Zak)</label><input type="number" value={w.pMinimal} onChange={e => w.setPMinimal(e.target.value)} /></div>
           <div className="form-group full"><label>Keterangan Tambahan</label><input value={w.pKet} onChange={e => w.setPKet(e.target.value)} /></div>
         </div>
+        {w.user?.role !== 'superadmin' && w.editingProduct && (
+          <div className="text-muted text-xs" style={{ marginBottom: '10px' }}>Hanya superadmin yang dapat mengubah stok langsung.</div>
+        )}
         <button className="btn btn-primary w-full" style={{ marginTop: '20px', justifyContent: 'center' }} onClick={w.saveProduk}>{w.editingProduct ? 'Perbarui Produk' : 'Simpan Produk'}</button>
       </div>
     </div>
