@@ -280,18 +280,31 @@ export default function TandaTerimaPage({ w }: Props) {
   const supa = w.supabase;
 
   const loadRecords = async () => {
-    const { data, error } = await supa.from('tanda_terima').select('*')
-      .order('print_date', { ascending: false }).order('sdo', { ascending: true }).limit(5000);
-    if (error) {
-      const msg = error.message || '';
-      const isMissing = /could not find the table/i.test(msg) || /does not exist/i.test(msg) || /42P01/i.test(msg);
-      if (isMissing) { setMissingTable(true); setRecords([]); return; }
-      console.error('Gagal memuat tanda terima:', msg);
-      w.triggerToast('Gagal memuat data. Pastikan tabel tanda_terima sudah dibuat & RLS aktif.', 'error');
-      setRecords([]); return;
+    // Supabase default max 1000 per request — loop sampai semua data ter-load
+    const allData: TandaTerima[] = [];
+    const PAGE = 1000;
+    let from = 0;
+    while (true) {
+      const { data, error } = await supa
+        .from('tanda_terima')
+        .select('*')
+        .order('print_date', { ascending: false })
+        .order('sdo', { ascending: true })
+        .range(from, from + PAGE - 1);
+      if (error) {
+        const msg = error.message || '';
+        const isMissing = /could not find the table/i.test(msg) || /does not exist/i.test(msg) || /42P01/i.test(msg);
+        if (isMissing) { setMissingTable(true); setRecords([]); return; }
+        console.error('Gagal memuat tanda terima:', msg);
+        w.triggerToast('Gagal memuat data. Pastikan tabel tanda_terima sudah dibuat & RLS aktif.', 'error');
+        setRecords([]); return;
+      }
+      allData.push(...(data as TandaTerima[]));
+      if (!data || data.length < PAGE) break; // sudah semua
+      from += PAGE;
     }
     setMissingTable(false);
-    setRecords(data as TandaTerima[]);
+    setRecords(allData);
   };
 
   useEffect(() => {
