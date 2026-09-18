@@ -142,6 +142,26 @@ const parseTandaTerima = (paste: string): ParsedRow[] => {
       jadwal_kirim = parseFlexDate(cells[sdoIdx + 1]);
     }
 
+    // Cari dan ekstrak contractor code jika ada (format "CONTRACTOR_CODE:xxxxx" atau "CONTRACTOR CODE:xxxxx")
+    // Harus dilakukan sebelum parse qty supaya tidak masuk sebagai qty
+    let contractor: string | null = null;
+    const contrIdx = cells.findIndex(c => /contractor.?code/i.test(c));
+    if (contrIdx !== -1) {
+      // bisa format "CONTRACTOR_CODE:C0460" (1 cell) atau "CONTRACTOR_CODE:" + "C0460" (2 cells)
+      const contrCell = cells[contrIdx];
+      const colonPart = contrCell.split(/[:]/)[1]?.trim();
+      if (colonPart) {
+        contractor = colonPart;
+      } else if (cells[contrIdx + 1]) {
+        contractor = cells[contrIdx + 1].trim();
+        cells.splice(contrIdx, 2); // hapus 2 cells
+      } else {
+        cells.splice(contrIdx, 1); // hapus 1 cell
+      }
+      if (colonPart) cells.splice(contrIdx, 1); // hapus cell contractor
+    }
+
+    // Rekalkuasi rest setelah contractor dihapus dari cells
     const rest = cells.slice(sdoIdx + (jadwal_kirim ? 2 : 1));
 
     let customer_code: string | null = null;
@@ -150,41 +170,40 @@ const parseTandaTerima = (paste: string): ParsedRow[] => {
     let destination: string | null = null;
     let cement_type: string | null = null;
     let pack: string | null = null;
-    let contractor: string | null = null;
+    // Urutan kolom rest (setelah contractor sudah dibuang):
+    // [customer_code?, customer, adres?, dest, cement, pack, '.', qty]
+    // Deteksi dari belakang: qty (angka), pack, cement, dest, lalu sisanya customer/adres
     let qty: number | null = null;
 
-    // Urutan kolom rest standar (Toko maupun Proyek):
-    // [customer_code, customer, adres, destination, cement_type, pack, contractor, qty]
-    if (rest.length >= 7) {
-      const qtyStr = rest[rest.length - 1];
-      const contrStr = rest[rest.length - 2];
-      const packStr = rest[rest.length - 3];
-      const cementStr = rest[rest.length - 4];
-      const destStr = rest[rest.length - 5];
-
+    if (rest.length >= 4) {
+      // Cari qty — kolom angka di paling belakang (skip titik '.')
+      let qtyIdx = rest.length - 1;
+      if (rest[qtyIdx] === '.') qtyIdx--; // skip titik separator
+      const qtyStr = rest[qtyIdx] || '';
       const numVal = Number(qtyStr.replace(/[^\d.]/g, ''));
       if (!isNaN(numVal) && numVal > 0 && numVal <= 50000) {
         qty = numVal;
       }
-      contractor = (contrStr === '.' || !contrStr) ? null : contrStr;
-      pack = packStr || null;
-      cement_type = cementStr || null;
-      destination = destStr || null;
 
-      const head = rest.slice(0, rest.length - 5);
-      if (head.length > 0 && /^\d{4,12}$/.test(head[0])) {
-        customer_code = head.shift() || null;
+      // pack = sebelum qty (atau sebelum titik)
+      const packIdx = qtyIdx - 1;
+      pack = rest[packIdx] || null;
+      cement_type = rest[packIdx - 1] || null;
+      destination = rest[packIdx - 2] || null;
+
+      const head = rest.slice(0, packIdx - 2);
+      // buang titik dari head kalau ada
+      const headClean = head.filter(c => c !== '.');
+      if (headClean.length > 0 && /^\d{4,12}$/.test(headClean[0])) {
+        customer_code = headClean.shift() || null;
       }
-      if (head.length > 0) {
-        customer = head.shift() || null;
-      }
-      if (head.length > 0) {
-        adres = head.join(' ') || null;
-      }
+      if (headClean.length > 0) customer = headClean.shift() || null;
+      if (headClean.length > 0) adres = headClean.join(' ') || null;
     } else {
-      if (rest.length > 0 && /^\d{4,12}$/.test(rest[0])) customer_code = rest.shift() || null;
-      if (rest.length > 0) customer = rest.shift() || null;
-      if (rest.length > 0) destination = rest.pop() || null;
+      const headClean = rest.filter(c => c !== '.');
+      if (headClean.length > 0 && /^\d{4,12}$/.test(headClean[0])) customer_code = headClean.shift() || null;
+      if (headClean.length > 0) customer = headClean.shift() || null;
+      if (headClean.length > 0) destination = headClean.pop() || null;
     }
 
     rows.push({
@@ -340,6 +359,7 @@ export default function TandaTerimaPage({ w }: Props) {
   const [tungguFor, setTungguFor] = useState<TandaTerima | null>(null);
   const [setorFor, setSetorFor] = useState<TandaTerima | null>(null);
   const [setorDate, setSetorDate] = useState(today());
+  const [kirimFor, setKirimFor] = useState<TandaTerima | null>(null);
   const [kirimDate, setKirimDate] = useState(today());
   const [moveFor, setMoveFor] = useState<TandaTerima | null>(null);
   const [riwayatOpen, setRiwayatOpen] = useState<string | null>(null);
@@ -961,7 +981,15 @@ export default function TandaTerimaPage({ w }: Props) {
                                     <>
                                       <button className={`badge ${statusKirimBadge[r.status_kirim]}`}
                                         style={{ border: 'none', cursor: 'pointer', padding: '3px 9px', fontFamily: 'inherit' }}
-                                        onClick={() => void toggleKirim(r)} title="Klik toggle">
+                                        onClick={() => {
+                                          if (r.status_kirim === 'terkirim' || r.status_kirim === 'batal') {
+                                            void toggleKirim(r);
+                                          } else {
+                                            setKirimDate(today());
+                                            setKirimFor(r);
+                                          }
+                                        }}
+                                        title={r.status_kirim === 'terkirim' ? 'Klik untuk batalkan kirim' : 'Klik untuk atur tanggal kirim'}>
                                         {statusKirimLabel[r.status_kirim]}
                                       </button>
                                       {r.status_kirim !== 'batal' && (
@@ -977,6 +1005,9 @@ export default function TandaTerimaPage({ w }: Props) {
                                 </div>
                                 {r.status_kirim === 'tunggu_info' && r.alasan_tunggu && (
                                   <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>{r.alasan_tunggu}</div>
+                                )}
+                                {r.status_kirim === 'terkirim' && r.delv_date && (
+                                  <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>{fmtDate(r.delv_date)}</div>
                                 )}
                                 {telat && (
                                   <div style={{ fontSize: 10, color: 'var(--danger)', fontWeight: 800, marginTop: 2 }}>
@@ -1034,6 +1065,36 @@ export default function TandaTerimaPage({ w }: Props) {
             </div>
           )}
         </>
+      )}
+
+      {/* Popover tanggal kirim */}
+      {kirimFor && (
+        <div className="modal-overlay" onClick={() => setKirimFor(null)}>
+          <div className="modal" style={{ maxWidth: 320 }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="modal-title">Tanggal Kirim — {kirimFor.sdo}</div>
+              <button className="modal-close" onClick={() => setKirimFor(null)}><X size={15} /></button>
+            </div>
+            <div style={{ display: 'grid', gap: 12, padding: '4px 0 8px' }}>
+              <div className="form-group">
+                <label>Tanggal Terkirim</label>
+                <input type="date" value={kirimDate} onChange={e => setKirimDate(e.target.value)} />
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+                Print date: <b>{fmtDate(kirimFor.print_date)}</b>
+              </div>
+            </div>
+            <div className="flex-row" style={{ justifyContent: 'flex-end', gap: 8 }}>
+              <button className="btn btn-ghost" onClick={() => setKirimFor(null)}>Batal</button>
+              <button className="btn btn-primary" onClick={() => {
+                void toggleKirim(kirimFor, kirimDate);
+                setKirimFor(null);
+              }}>
+                Konfirmasi Kirim
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Popover tanggal setor */}
