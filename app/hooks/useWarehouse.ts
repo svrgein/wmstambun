@@ -1258,17 +1258,20 @@ export function useWarehouse() {
       triggerToast('Akses ditolak: hanya admin yang dapat mengubah absen.', 'error');
       return null;
     }
-    const result = id
-      ? await supabase.from('absen_harian').update({ ...input, updated_at: new Date().toISOString() }).eq('id', id).select().single()
-      : (() => {
-          // Cek existing dulu — jika sudah ada untuk angkutan_id + tanggal yang sama, update bukan insert
-          const existing = input.angkutan_id
-            ? absenRows.find(r => r.angkutan_id === input.angkutan_id && r.tanggal === input.tanggal)
-            : null;
-          return existing
-            ? supabase.from('absen_harian').update({ ...input, updated_at: new Date().toISOString() }).eq('id', existing.id).select().single()
-            : supabase.from('absen_harian').insert({ ...input, created_by: user.id }).select().single();
-        })();
+    // Kalau insert baru, cek dulu existing untuk angkutan_id + tanggal — hindari double
+    let result;
+    if (id) {
+      result = await supabase.from('absen_harian').update({ ...input, updated_at: new Date().toISOString() }).eq('id', id).select().single();
+    } else {
+      const existing = input.angkutan_id
+        ? absenRows.find(r => r.angkutan_id === input.angkutan_id && r.tanggal === input.tanggal)
+        : null;
+      if (existing) {
+        result = await supabase.from('absen_harian').update({ ...input, updated_at: new Date().toISOString() }).eq('id', existing.id).select().single();
+      } else {
+        result = await supabase.from('absen_harian').insert({ ...input, created_by: user.id }).select().single();
+      }
+    }
     if (result.error) {
       triggerToast(`Gagal simpan absen: ${result.error.message}`, 'error');
       return null;
