@@ -44,6 +44,7 @@ const SETUP_SQL = `create table if not exists public.tanda_terima (
   destination text null,
   cement_type text null,
   pack text null,
+  contractor text null,
   qty numeric null,
   status_kirim text not null default 'belum' check (status_kirim in ('belum','tunggu_info','terkirim','batal')),
   alasan_tunggu text null,
@@ -57,6 +58,7 @@ const SETUP_SQL = `create table if not exists public.tanda_terima (
   updated_at timestamptz not null default now(),
   unique (sdo)
 );
+alter table public.tanda_terima add column if not exists contractor text null;
 create index if not exists tanda_terima_print_idx on public.tanda_terima (print_date desc);
 create index if not exists tanda_terima_angkutan_idx on public.tanda_terima (angkutan);
 create index if not exists tanda_terima_kirim_idx on public.tanda_terima (status_kirim);
@@ -106,6 +108,7 @@ export interface ParsedRow {
   destination: string | null;
   cement_type: string | null;
   pack: string | null;
+  contractor: string | null;
   qty: number | null;
 }
 
@@ -116,20 +119,86 @@ const parseTandaTerima = (paste: string): ParsedRow[] => {
     if (/search by sdo/i.test(line)) return;
     if (/^no\b|print date|order date|customer code/i.test(line)) return;
     if (/^[A-Za-z]{3,}\s+\d{4}$/.test(line)) return;
+
     let cells = line.includes('\t') ? line.split('\t') : line.split(/\s{2,}/);
-    cells = cells.map(c => c.trim()).filter(c => c !== '' && c !== '.');
+    // HANYA filter cell kosong, JANGAN buang '.' karena '.' adalah isi kolom contractor untuk Toko
+    cells = cells.map(c => c.trim()).filter(c => c !== '');
     if (cells.length < 3) return;
     if (/^\d{1,3}$/.test(cells[0])) cells = cells.slice(1);
     if (cells.length < 3) return;
-    const [order_date, sdo, jadwal_kirim, customer_code, customer, adres,
-      destination, cement_type, pack, qty] = cells;
-    if (!sdo || !/^\d{4,}$/.test(sdo)) return;
+
+    // Cari posisi SDO (angka 6-12 digit di 3 kolom awal)
+    let sdoIdx = cells.findIndex((c, i) => i < 3 && /^\d{6,12}$/.test(c));
+    if (sdoIdx === -1) return;
+
+    let order_date: string | null = null;
+    const sdo = cells[sdoIdx];
+    let jadwal_kirim: string | null = null;
+
+    if (sdoIdx > 0) {
+      order_date = parseFlexDate(cells[0]);
+    }
+    if (cells[sdoIdx + 1] && (parseFlexDate(cells[sdoIdx + 1]) || /^\d{1,2}[\/\-. ]/i.test(cells[sdoIdx + 1]))) {
+      jadwal_kirim = parseFlexDate(cells[sdoIdx + 1]);
+    }
+
+    const rest = cells.slice(sdoIdx + (jadwal_kirim ? 2 : 1));
+
+    let customer_code: string | null = null;
+    let customer: string | null = null;
+    let adres: string | null = null;
+    let destination: string | null = null;
+    let cement_type: string | null = null;
+    let pack: string | null = null;
+    let contractor: string | null = null;
+    let qty: number | null = null;
+
+    // Urutan kolom rest standar (Toko maupun Proyek):
+    // [customer_code, customer, adres, destination, cement_type, pack, contractor, qty]
+    if (rest.length >= 7) {
+      const qtyStr = rest[rest.length - 1];
+      const contrStr = rest[rest.length - 2];
+      const packStr = rest[rest.length - 3];
+      const cementStr = rest[rest.length - 4];
+      const destStr = rest[rest.length - 5];
+
+      const numVal = Number(qtyStr.replace(/[^\d.]/g, ''));
+      if (!isNaN(numVal) && numVal > 0 && numVal <= 50000) {
+        qty = numVal;
+      }
+      contractor = (contrStr === '.' || !contrStr) ? null : contrStr;
+      pack = packStr || null;
+      cement_type = cementStr || null;
+      destination = destStr || null;
+
+      const head = rest.slice(0, rest.length - 5);
+      if (head.length > 0 && /^\d{4,12}$/.test(head[0])) {
+        customer_code = head.shift() || null;
+      }
+      if (head.length > 0) {
+        customer = head.shift() || null;
+      }
+      if (head.length > 0) {
+        adres = head.join(' ') || null;
+      }
+    } else {
+      if (rest.length > 0 && /^\d{4,12}$/.test(rest[0])) customer_code = rest.shift() || null;
+      if (rest.length > 0) customer = rest.shift() || null;
+      if (rest.length > 0) destination = rest.pop() || null;
+    }
+
     rows.push({
-      order_date: parseFlexDate(order_date), sdo: sdo.trim(),
-      jadwal_kirim: parseFlexDate(jadwal_kirim), customer_code: customer_code || null,
-      customer: customer || null, adres: adres || null, destination: destination || null,
-      cement_type: cement_type || null, pack: pack || null,
-      qty: qty ? Number(qty.replace(/[^\d.]/g, '')) || null : null,
+      order_date,
+      sdo: sdo.trim(),
+      jadwal_kirim,
+      customer_code,
+      customer,
+      adres,
+      destination,
+      cement_type,
+      pack,
+      contractor,
+      qty,
     });
   });
   return rows;
@@ -269,6 +338,9 @@ export default function TandaTerimaPage({ w }: Props) {
   const [rangeSampai, setRangeSampai] = useState('');
   const [draft, setDraft] = useState<TandaTerima | null>(null);
   const [tungguFor, setTungguFor] = useState<TandaTerima | null>(null);
+  const [setorFor, setSetorFor] = useState<TandaTerima | null>(null);
+  const [setorDate, setSetorDate] = useState(today());
+  const [kirimDate, setKirimDate] = useState(today());
   const [moveFor, setMoveFor] = useState<TandaTerima | null>(null);
   const [riwayatOpen, setRiwayatOpen] = useState<string | null>(null);
   const [highlightId, setHighlightId] = useState<string | null>(null);
@@ -457,7 +529,7 @@ export default function TandaTerimaPage({ w }: Props) {
         print_date: selectedDate, angkutan: ak, order_date: r.order_date, sdo: r.sdo,
         jadwal_kirim: r.jadwal_kirim, customer_code: r.customer_code, customer: r.customer,
         adres: r.adres, destination: r.destination, cement_type: r.cement_type,
-        pack: r.pack, qty: r.qty, status_kirim: 'belum', status_setoran: 'belum', created_by: w.user!.id,
+        pack: r.pack, contractor: r.contractor, qty: r.qty, status_kirim: 'belum', status_setoran: 'belum', created_by: w.user!.id,
       }));
       const toUpdate = skipExisting ? [] : rows.filter(r => existSet.has(r.sdo));
       if (toInsert.length === 0 && toUpdate.length === 0) {
@@ -472,7 +544,7 @@ export default function TandaTerimaPage({ w }: Props) {
         const { error } = await supa.from('tanda_terima').update({
           print_date: selectedDate, angkutan: ak, order_date: r.order_date,
           jadwal_kirim: r.jadwal_kirim, customer_code: r.customer_code, customer: r.customer,
-          adres: r.adres, destination: r.destination, cement_type: r.cement_type, pack: r.pack, qty: r.qty,
+          adres: r.adres, destination: r.destination, cement_type: r.cement_type, pack: r.pack, contractor: r.contractor, qty: r.qty,
         }).eq('sdo', r.sdo);
         if (error) throw error;
       }
@@ -503,27 +575,27 @@ export default function TandaTerimaPage({ w }: Props) {
     await loadRecords();
   };
 
-  const toggleKirim = (r: TandaTerima) => {
+  const toggleKirim = (r: TandaTerima, tgl?: string) => {
     if (r.status_kirim === 'terkirim' || r.status_kirim === 'batal') {
       patchRow(r, { status_kirim: 'belum', alasan_tunggu: null, delv_date: null }, `SDO ${r.sdo} → belum kirim`);
     } else {
-      patchRow(r, { status_kirim: 'terkirim', delv_date: today(), alasan_tunggu: null }, `SDO ${r.sdo} → terkirim`);
+      patchRow(r, { status_kirim: 'terkirim', delv_date: tgl || today(), alasan_tunggu: null }, `SDO ${r.sdo} → terkirim (${fmtDate(tgl || today())})`);
     }
   };
   const pickTunggu = (r: TandaTerima, alasan: string) =>
     patchRow(r, { status_kirim: 'tunggu_info', alasan_tunggu: alasan }, `SDO ${r.sdo} → tunggu info`);
   const batalkan = (r: TandaTerima) =>
     patchRow(r, { status_kirim: 'batal', alasan_tunggu: null, delv_date: null }, `SDO ${r.sdo} → batal`);
-  const toggleSetoran = (r: TandaTerima) => {
+  const toggleSetoran = (r: TandaTerima, tgl?: string) => {
     if (r.status_setoran === 'belum') {
-      patchRow(r, { status_setoran: 'disetor', setoran_note: SETORAN_DEFAULT_NOTE }, `SDO ${r.sdo} → disetor`);
+      patchRow(r, { status_setoran: 'disetor', setor_date: tgl || today(), setoran_note: SETORAN_DEFAULT_NOTE }, `SDO ${r.sdo} → disetor (${fmtDate(tgl || today())})`);
     } else {
-      patchRow(r, { status_setoran: 'belum', setoran_note: null }, `SDO ${r.sdo} → belum setor`);
+      patchRow(r, { status_setoran: 'belum', setor_date: null, setoran_note: null }, `SDO ${r.sdo} → belum setor`);
     }
   };
   // set-only (buat quick-bar): set ke disetor, gak toggle balik
-  const markDisetor = (r: TandaTerima) =>
-    patchRow(r, { status_setoran: 'disetor', setoran_note: SETORAN_DEFAULT_NOTE }, `SDO ${r.sdo} → disetor`);
+  const markDisetor = (r: TandaTerima, tgl?: string) =>
+    patchRow(r, { status_setoran: 'disetor', setor_date: tgl || today(), setoran_note: SETORAN_DEFAULT_NOTE }, `SDO ${r.sdo} → disetor (${fmtDate(tgl || today())})`);
   const moveAngkutan = (r: TandaTerima, ak: string) =>
     patchRow(r, { angkutan: ak }, `SDO ${r.sdo} → angkutan ${ak}`);
 
@@ -558,7 +630,7 @@ export default function TandaTerimaPage({ w }: Props) {
     setAllDates(false);
     setSelectedDate(r.print_date);
     setCategory(rowCategory(r.angkutan));
-    if (mode === 'kirim') await toggleKirim(r); else await markDisetor(r);
+    if (mode === 'kirim') await toggleKirim(r, kirimDate); else await markDisetor(r, setorDate);
     setHighlightId(r.id);  // scroll + highlight setelah render
     setQuickSdo(''); quickRef.current?.focus();
   };
@@ -571,14 +643,16 @@ export default function TandaTerimaPage({ w }: Props) {
       return (a.created_at || '').localeCompare(b.created_at || '');
     });
     const cols = ['No','PRINT DATE','ORDER DATE','SDO','JADWAL KIRIM','CUSTOMER CODE',
-      'CUSTOMER','ADRES','DESTINATION','CEMENT TYPE','PACK','.','QTY','STATUS','DELV DATE','SETORAN']
-      .map(h => ({ header: h, width: h === 'ADRES' ? 42 : 14 }));
+      'CUSTOMER','ADRES','DESTINATION','CEMENT TYPE','PACK','.','QTY','STATUS','DELV DATE','SETOR DATE','SETORAN']
+      .map(h => ({ header: h, width: h === 'ADRES' ? 42 : h === '.' ? 24 : 14 }));
     const dataRows = sorted.map((r, i) => [
       i + 1, fmtDate(r.print_date), r.order_date ? fmtDate(r.order_date) : '', r.sdo,
       r.jadwal_kirim ? fmtDate(r.jadwal_kirim) : '', r.customer_code || '', r.customer || '',
-      r.adres || '', r.destination || '', r.cement_type || '', r.pack || '', '.',
+      r.adres || '', r.destination || '', r.cement_type || '', r.pack || '',
+      r.contractor || '.',
       r.qty ?? '', statusKirimLabelEn[r.status_kirim] || r.status_kirim,
       r.delv_date ? fmtDate(r.delv_date) : '',
+      r.setor_date ? fmtDate(r.setor_date) : '',
       r.status_setoran === 'disetor' ? (r.setoran_note || SETORAN_DEFAULT_NOTE) : '',
     ]);
     const safeName = (name === '— Tanpa Angkutan' ? 'Tanpa_Angkutan' : name).replace(/[\\/?*[\]:]/g, ' ').slice(0, 28);
@@ -756,6 +830,8 @@ export default function TandaTerimaPage({ w }: Props) {
             {admin && (
               <QuickPopover mode={mode} setMode={setMode} quickSdo={quickSdo} setQuickSdo={setQuickSdo}
                 apply={applyQuick} quickRef={quickRef} records={records || []}
+                kirimDate={kirimDate} setKirimDate={setKirimDate}
+                setorDate={setorDate} setSetorDate={setSetorDate}
                 pending={pending} setPending={setPending}
                 blomSetor={blomSetor} setBlomSetor={setBlomSetor}
                 pendingCount={pendingCount} blomSetorCount={blomSetorCount} telatSetorCount={telatSetorCount} />
@@ -843,6 +919,7 @@ export default function TandaTerimaPage({ w }: Props) {
                           <th>CUSTOMER</th>
                           <th className="tt-col-dest">DEST</th>
                           <th className="tt-col-cement">SEMEN</th>
+                          <th className="tt-col-dest" style={{ minWidth: 40 }}>.</th>
                           <th style={{ width: 46, textAlign: 'right' }}>QTY</th>
                           <th style={{ minWidth: 90 }}>STATUS KIRIM</th>
                           <th className="tt-col-delv">DELV</th>
@@ -871,6 +948,9 @@ export default function TandaTerimaPage({ w }: Props) {
                               <td className="tt-col-dest" style={{ maxWidth: 110, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-sub)' }}>{r.destination || '—'}</td>
                               <td className="tt-col-cement" style={{ whiteSpace: 'nowrap', color: 'var(--text-sub)' }}>
                                 {r.cement_type || '—'}{r.pack && <span style={{ fontSize: 10, color: 'var(--muted)', marginLeft: 4 }}>{r.pack}</span>}
+                              </td>
+                              <td className="tt-col-dest" style={{ whiteSpace: 'nowrap', fontSize: 11, color: r.contractor ? 'var(--accent)' : 'var(--muted)', fontWeight: r.contractor ? 700 : 400 }}>
+                                {r.contractor || '.'}
                               </td>
                               <td style={{ textAlign: 'right', fontWeight: 700 }}>{r.qty != null ? fmt(r.qty) : '—'}</td>
 
@@ -914,15 +994,26 @@ export default function TandaTerimaPage({ w }: Props) {
                                 {admin ? (
                                   <button className={`badge ${statusSetoranBadge[r.status_setoran]}`}
                                     style={{ border: 'none', cursor: 'pointer', padding: '3px 9px', fontFamily: 'inherit' }}
-                                    onClick={() => void toggleSetoran(r)} title="Klik toggle">
+                                    onClick={() => {
+                                      if (r.status_setoran === 'belum') {
+                                        setSetorDate(today());
+                                        setSetorFor(r);
+                                      } else {
+                                        void toggleSetoran(r);
+                                      }
+                                    }}
+                                    title={r.status_setoran === 'belum' ? 'Klik untuk atur tanggal setor' : 'Klik untuk batalkan setoran'}>
                                     {statusSetoranLabel[r.status_setoran]}
                                   </button>
                                 ) : (
                                   <span className={`badge ${statusSetoranBadge[r.status_setoran]}`}>{statusSetoranLabel[r.status_setoran]}</span>
                                 )}
+                                {r.setor_date && r.status_setoran === 'disetor' && (
+                                  <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>{fmtDate(r.setor_date)}</div>
+                                )}
                                 {telatSetor && (
                                   <div style={{ fontSize: 10, fontWeight: 800, marginTop: 2, color: daysSince(r.delv_date) > 2 ? 'var(--danger)' : 'var(--warn)' }}>
-                                    {daysSince(r.delv_date)}h blom setor
+                                    {daysSince(r.delv_date) === 0 ? 'SJ belum di setor' : `${daysSince(r.delv_date)}h SJ belum di setor`}
                                   </div>
                                 )}
                               </td>
@@ -943,6 +1034,36 @@ export default function TandaTerimaPage({ w }: Props) {
             </div>
           )}
         </>
+      )}
+
+      {/* Popover tanggal setor */}
+      {setorFor && (
+        <div className="modal-overlay" onClick={() => setSetorFor(null)}>
+          <div className="modal" style={{ maxWidth: 320 }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="modal-title">Tanggal Setor — {setorFor.sdo}</div>
+              <button className="modal-close" onClick={() => setSetorFor(null)}><X size={15} /></button>
+            </div>
+            <div style={{ display: 'grid', gap: 12, padding: '4px 0 8px' }}>
+              <div className="form-group">
+                <label>Tanggal Setoran</label>
+                <input type="date" value={setorDate} onChange={e => setSetorDate(e.target.value)} />
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+                DO terkirim: <b>{setorFor.delv_date ? fmtDate(setorFor.delv_date) : '—'}</b>
+              </div>
+            </div>
+            <div className="flex-row" style={{ justifyContent: 'flex-end', gap: 8 }}>
+              <button className="btn btn-ghost" onClick={() => setSetorFor(null)}>Batal</button>
+              <button className="btn btn-primary" onClick={() => {
+                void toggleSetoran(setorFor, setorDate);
+                setSetorFor(null);
+              }}>
+                Konfirmasi Setor
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Popover alasan tunggu */}
@@ -1129,6 +1250,8 @@ function QuickPopover(props: {
   mode: QuickMode; setMode: (m: QuickMode) => void;
   quickSdo: string; setQuickSdo: (s: string) => void; apply: () => void;
   quickRef: React.RefObject<HTMLInputElement | null>; records: TandaTerima[];
+  kirimDate: string; setKirimDate: (d: string) => void;
+  setorDate: string; setSetorDate: (d: string) => void;
   pending: boolean; setPending: (f: boolean | ((p: boolean) => boolean)) => void;
   blomSetor: boolean; setBlomSetor: (f: boolean | ((b: boolean) => boolean)) => void;
   pendingCount: number; blomSetorCount: number; telatSetorCount: number;
@@ -1153,6 +1276,18 @@ function QuickPopover(props: {
               <button type="button" style={{ flex: 1, justifyContent: 'center', background: props.mode === 'setoran' ? 'var(--success)' : 'transparent', color: props.mode === 'setoran' ? '#fff' : 'var(--muted)' }}
                 onClick={() => { props.setMode('setoran'); props.quickRef.current?.focus(); }}><Stamp style={{ width: 13, height: 13 }} /> Setoran</button>
             </div>
+            {props.mode === 'kirim' && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%' }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', whiteSpace: 'nowrap' }}>Tgl Kirim:</span>
+                <input type="date" value={props.kirimDate} onChange={e => props.setKirimDate(e.target.value)} style={{ flex: 1, fontSize: 12, padding: '3px 6px' }} />
+              </div>
+            )}
+            {props.mode === 'setoran' && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%' }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', whiteSpace: 'nowrap' }}>Tgl Setor:</span>
+                <input type="date" value={props.setorDate} onChange={e => props.setSetorDate(e.target.value)} style={{ flex: 1, fontSize: 12, padding: '3px 6px' }} />
+              </div>
+            )}
             <div className="search-box" style={{ flex: '1 1 100%' }}>
               <Search />
               <input ref={props.quickRef} list="tt-sdo-list" placeholder="Ketik SDO + Enter… (lintas semua)"
@@ -1252,10 +1387,12 @@ function EditForm({ draft, setDraft }: { draft: TandaTerima; setDraft: (d: Tanda
       <div className="form-group"><label>Destination</label><input value={draft.destination || ''} onChange={e => set({ destination: e.target.value })} /></div>
       <div className="form-group"><label>Cement Type</label><input value={draft.cement_type || ''} onChange={e => set({ cement_type: e.target.value })} /></div>
       <div className="form-group"><label>Pack</label><input value={draft.pack || ''} onChange={e => set({ pack: e.target.value })} /></div>
+      <div className="form-group"><label>Kolom . / Contractor</label><input value={draft.contractor || ''} onChange={e => set({ contractor: e.target.value || null })} /></div>
       <div className="form-group"><label>Qty</label><input type="number" value={draft.qty ?? ''} onChange={e => set({ qty: e.target.value === '' ? null : Number(e.target.value) })} /></div>
       <div className="form-group"><label>Delv Date</label><input type="date" value={draft.delv_date || ''} onChange={e => set({ delv_date: e.target.value || null })} /></div>
       <div className="form-group"><label>Status Kirim</label><select value={draft.status_kirim} onChange={e => set({ status_kirim: e.target.value as TandaTerima['status_kirim'] })}><option value="belum">Belum</option><option value="tunggu_info">Tunggu Info</option><option value="terkirim">Terkirim</option><option value="batal">Batal</option></select></div>
       <div className="form-group"><label>Status Setoran</label><select value={draft.status_setoran} onChange={e => set({ status_setoran: e.target.value as TandaTerima['status_setoran'] })}><option value="belum">Belum</option><option value="disetor">Disetor</option></select></div>
+      <div className="form-group"><label>Setor Date</label><input type="date" value={draft.setor_date || ''} onChange={e => set({ setor_date: e.target.value || null })} /></div>
       <div className="form-group" style={{ gridColumn: '1 / -1' }}><label>Setoran Note</label><input value={draft.setoran_note || ''} onChange={e => set({ setoran_note: e.target.value })} /></div>
       <div className="form-group" style={{ gridColumn: '1 / -1' }}><label>Catatan</label><textarea rows={2} value={draft.catatan || ''} onChange={e => set({ catatan: e.target.value })} /></div>
     </div>

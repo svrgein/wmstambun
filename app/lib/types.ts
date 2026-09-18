@@ -219,6 +219,7 @@ export interface TandaTerima {
   destination: string | null;         // area (cth TARUMAJAYA)
   cement_type: string | null;         // jenis semen (cth PCC)
   pack: string | null;                // berat/zak (cth 50 KG)
+  contractor: string | null;          // contractor code / info proyek (kolom ke-9 paste, default '.')
   qty: number | null;                 // jumlah zak
   // tracking (input di app):
   status_kirim: 'belum' | 'tunggu_info' | 'terkirim' | 'batal';
@@ -226,6 +227,7 @@ export interface TandaTerima {
   delv_date: string | null;           // tanggal kirim aktual
   status_setoran: 'belum' | 'disetor';
   setoran_note: string | null;        // cth "SURAT JALAN SUDAH DI SETOR KE GUDANG"
+  setor_date: string | null;          // tanggal setoran aktual
   cek_angkutan: 'belum' | 'sudah';    // udah dicek/verify angkutan vs sistem distributor?
   catatan: string | null;
   created_by: string | null;
