@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { Check, Pencil, Truck, X } from 'lucide-react';
 import type { UseWarehouseReturn } from '@/app/hooks/useWarehouse';
 import type { AbsenHarian } from '@/app/lib/types';
 
@@ -62,22 +63,27 @@ export default function ModalAbsen({ w, tanggal, editing, onClose }: Props) {
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
-          <div className="modal-title">
-            {isEdit ? '✏️ Edit Absen' : isBantuan ? '🚚 Tambah Supir Bantuan' : '✏️ Edit Absen'}
+          <div>
+            <div className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+              {isEdit
+                ? <><Pencil style={{ width: 15, height: 15, color: 'var(--accent)' }} /> Edit Absen</>
+                : <><Truck style={{ width: 15, height: 15, color: 'var(--accent)' }} /> Tambah Supir Bantuan</>}
+            </div>
+            <div className="text-xs text-muted" style={{ marginTop: 4 }}>{tanggal}</div>
           </div>
-          <button className="modal-close" onClick={onClose}>✕</button>
+          <button className="modal-close" onClick={onClose} aria-label="Tutup"><X style={{ width: 15, height: 15 }} /></button>
         </div>
 
         {!isBantuan && (
           <div className="alert alert-warn" style={{ marginBottom: '16px' }}>
-            Nama/kendaraan supir tetap mengikuti data master armada dan tidak bisa diubah di sini.
+            Nama / kendaraan supir tetap mengikuti data master armada dan tidak bisa diubah di sini.
           </div>
         )}
 
         <div className="form-grid">
           <div className="form-group">
             <label>Nama Sopir</label>
-            <input value={namaSopir} onChange={e => setNamaSopir(e.target.value)} placeholder="Pak Budi" disabled={!isBantuan && isEdit} />
+            <input value={namaSopir} onChange={e => setNamaSopir(e.target.value)} placeholder="Pak Budi" disabled={!isBantuan && isEdit} autoFocus={isBantuan && !isEdit} />
           </div>
           <div className="form-group">
             <label>Nama Kendaraan / PO</label>
@@ -91,7 +97,7 @@ export default function ModalAbsen({ w, tanggal, editing, onClose }: Props) {
               </div>
               <div className="form-group">
                 <label>Kapasitas (Zak)</label>
-                <input type="number" value={kapasitas} onChange={e => setKapasitas(e.target.value)} placeholder="200" />
+                <input type="number" min={0} value={kapasitas} onChange={e => setKapasitas(e.target.value)} placeholder="200" />
               </div>
               <div className="form-group full">
                 <label>Bantuan Dari Gudang</label>
@@ -99,21 +105,17 @@ export default function ModalAbsen({ w, tanggal, editing, onClose }: Props) {
               </div>
             </>
           )}
-          <div className="form-group">
-            <label>Status</label>
-            <select value={status} onChange={e => setStatus(e.target.value as 'hadir' | 'tidak')}>
-              <option value="hadir">Hadir</option>
-              <option value="tidak">Tidak Hadir</option>
-            </select>
-          </div>
-          <div className="form-group">
-            <label>Tanggal</label>
-            <input type="date" value={tanggal} disabled />
+          <div className="form-group full">
+            <label>Status Kehadiran</label>
+            <div className="seg" style={{ marginTop: '4px' }}>
+              <button type="button" className={status === 'hadir' ? 'on-hadir' : ''} onClick={() => setStatus('hadir')}><Check /> Hadir</button>
+              <button type="button" className={status === 'tidak' ? 'on-tidak' : ''} onClick={() => setStatus('tidak')}><X /> Tidak Hadir</button>
+            </div>
           </div>
         </div>
 
         {isHadir && (
-          <div className="form-grid" style={{ marginTop: '13px' }}>
+          <div className="form-grid" style={{ marginTop: '14px' }}>
             <div className="form-group">
               <label>Jumlah Pallet</label>
               <input
@@ -138,9 +140,12 @@ export default function ModalAbsen({ w, tanggal, editing, onClose }: Props) {
           </div>
         )}
 
-        <button className="btn btn-primary w-full" style={{ marginTop: '20px', justifyContent: 'center' }} onClick={() => void save()}>
-          {isEdit ? 'Simpan Perubahan' : 'Tambah & Simpan'}
-        </button>
+        <div className="flex-row" style={{ justifyContent: 'flex-end', gap: '8px', marginTop: '20px' }}>
+          <button className="btn btn-ghost" onClick={onClose}>Batal</button>
+          <button className="btn btn-primary" onClick={() => void save()}>
+            {isEdit ? 'Simpan Perubahan' : 'Tambah & Simpan'}
+          </button>
+        </div>
       </div>
     </div>
   );

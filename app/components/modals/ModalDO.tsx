@@ -6,8 +6,26 @@ import { fmt } from '@/app/lib/helpers';
 
 interface Props { w: UseWarehouseReturn; }
 
+// Format: XXXX-XXXX-XX  (4 digit - 4 digit - 2 digit)
+// Contoh: 0233-0250-09
+function formatNoDO(raw: string): string {
+  // Ambil hanya angka
+  const digits = raw.replace(/\D/g, '').slice(0, 10);
+  if (digits.length <= 4) return digits;
+  if (digits.length <= 8) return `${digits.slice(0, 4)}-${digits.slice(4)}`;
+  return `${digits.slice(0, 4)}-${digits.slice(4, 8)}-${digits.slice(8)}`;
+}
+
 export default function ModalDO({ w }: Props) {
   if (!w.modalDO) return null;
+
+  const handleNoDO = (e: React.ChangeEvent<HTMLInputElement>) => {
+    w.setDoNoDO(formatNoDO(e.target.value));
+  };
+
+  const isValidNoDO = /^\d{4}-\d{4}-\d{2}$/.test(w.doNoDO);
+  const showHint = w.doNoDO.length > 0 && !isValidNoDO;
+
   return (
     <div className="modal-overlay" onClick={() => w.setModalDO(false)}>
       <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
@@ -18,7 +36,19 @@ export default function ModalDO({ w }: Props) {
         <div className="form-grid" style={{ marginBottom: '16px' }}>
           <div className="form-group full">
             <label>No SDO</label>
-            <input value={w.doNoDO} onChange={e => w.setDoNoDO(e.target.value)} placeholder="Masukkan No SDO" />
+            <input
+              value={w.doNoDO}
+              onChange={handleNoDO}
+              placeholder="0233-0250-09"
+              inputMode="numeric"
+              maxLength={12}
+              style={showHint ? { borderColor: 'var(--warn)' } : isValidNoDO && w.doNoDO ? { borderColor: 'var(--success)' } : {}}
+            />
+            {showHint && (
+              <span style={{ fontSize: '11.5px', color: 'var(--warn)', marginTop: '5px', display: 'block', fontWeight: 600 }}>
+                Format: 0233-0250-09 (4 digit - 4 digit - 2 digit)
+              </span>
+            )}
           </div>
           <div className="form-group full">
             <label>Toko Tujuan</label>

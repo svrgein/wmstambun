@@ -173,6 +173,26 @@ export interface AuditLog {
   profiles?: { nama: string };
 }
 
+export interface SetoranSJ {
+  id: string;
+  no_sj: string;
+  angkutan: string;
+  toko: string;
+  tanggal: string | null;
+  status: 'belum' | 'disetor';
+  alasan: string | null;
+  catatan: string | null;
+  disetor_tanggal: string | null;
+  disetor_oleh: string | null;
+  dibuat_oleh: string | null;
+  updated_oleh: string | null;
+  created_at: string;
+  updated_at: string;
+  disetorBy?: { nama: string };
+  dibuatBy?: { nama: string };
+  updatedBy?: { nama: string };
+}
+
 export interface PalletStok {
   id: string;
   total_pallet: number;
@@ -180,6 +200,36 @@ export interface PalletStok {
   pallet_isi: number;
   pallet_angkutan: number;
   keterangan: string;
+  updated_at: string;
+}
+
+// Buku Tanda Terima DO — berbasis paste dari app DO eksternal.
+// Satu baris = satu SDO, dilengkapi tracking kirim & setoran.
+export interface TandaTerima {
+  id: string;
+  print_date: string;                 // tanggal print (yg user pilih)
+  angkutan: string;                   // nama transporter (cth INTITRANS/GMS)
+  // kolom dari paste (app eksternal):
+  order_date: string | null;          // tanggal DO dibuat
+  sdo: string;                        // SDO / no DO (KEY)
+  jadwal_kirim: string | null;        // jadwal kirim DO
+  customer_code: string | null;
+  customer: string | null;            // nama toko
+  adres: string | null;               // alamat lengkap
+  destination: string | null;         // area (cth TARUMAJAYA)
+  cement_type: string | null;         // jenis semen (cth PCC)
+  pack: string | null;                // berat/zak (cth 50 KG)
+  qty: number | null;                 // jumlah zak
+  // tracking (input di app):
+  status_kirim: 'belum' | 'tunggu_info' | 'terkirim' | 'batal';
+  alasan_tunggu: string | null;
+  delv_date: string | null;           // tanggal kirim aktual
+  status_setoran: 'belum' | 'disetor';
+  setoran_note: string | null;        // cth "SURAT JALAN SUDAH DI SETOR KE GUDANG"
+  cek_angkutan: 'belum' | 'sudah';    // udah dicek/verify angkutan vs sistem distributor?
+  catatan: string | null;
+  created_by: string | null;
+  created_at: string;
   updated_at: string;
 }
 

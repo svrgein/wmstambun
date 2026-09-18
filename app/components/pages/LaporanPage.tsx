@@ -3,47 +3,53 @@
 import React from 'react';
 import type { UseWarehouseReturn } from '@/app/hooks/useWarehouse';
 import { fmt, fmtDate, fmtTime, fmtTon } from '@/app/lib/helpers';
+import { downloadXlsx } from '@/app/lib/exportXlsx';
 import { Download } from 'lucide-react';
 
 interface Props { w: UseWarehouseReturn; }
 
 export default function LaporanPage({ w }: Props) {
-  const handleExportExcel = () => {
-    // 1. Siapkan header kolom yang rapi (tanpa ID/UUID database)
-    const headers = ['Tanggal', 'Waktu', 'Jenis', 'Produk', 'Merk', 'Zak', 'Tonase', 'No. Surat', 'Mitra / Customer', 'Petugas', 'Keterangan'];
-    
-    // 2. Format baris data agar hanya memuat nama yang mudah dibaca, bukan ID
+  const handleExportExcel = async () => {
+    const headers = [
+      { header: 'Tanggal', width: 13, align: 'center' as const },
+      { header: 'Waktu', width: 10, align: 'center' as const },
+      { header: 'Jenis', width: 9, align: 'center' as const },
+      { header: 'Produk', width: 22 },
+      { header: 'Merk', width: 14 },
+      { header: 'Zak', width: 11, numFmt: '#,##0' },
+      { header: 'Tonase', width: 12, numFmt: '#,##0.000' },
+      { header: 'No. Surat', width: 18 },
+      { header: 'Mitra / Customer', width: 26, wrap: true },
+      { header: 'Petugas', width: 20 },
+      { header: 'Keterangan', width: 44, wrap: true },
+    ];
+
     const rows = w.filteredTrx.map(t => {
       const berat = t.produk?.berat_per_zak || 50;
       const ton = (t.jumlah_zak * berat) / 1000;
-      
       return [
         fmtDate(t.tanggal),
         fmtTime(t.tanggal),
         t.jenis.toUpperCase(),
-        `"${t.produk?.nama || ''}"`, // Pakai kutip ganda untuk antisipasi koma di teks
-        `"${t.produk?.merk || ''}"`,
+        t.produk?.nama || '',
+        t.produk?.merk || '',
         t.jumlah_zak,
-        ton,
-        `"${t.no_surat || ''}"`,
-        `"${t.pihak || ''}"`,
-        `"${t.profiles?.nama || 'System'}"`,
-        `"${t.keterangan || ''}"`
-      ].join(','); // Gabungkan dengan koma untuk format CSV
+        Math.round(ton * 1000) / 1000,
+        t.no_surat || '',
+        t.pihak || '',
+        t.profiles?.nama || 'System',
+        t.keterangan || '',
+      ];
     });
 
-    // 3. Gabungkan header dan data
-    const csvContent = [headers.join(','), ...rows].join('\n');
-
-    // 4. Proses download file Excel (CSV)
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', `Laporan_Transaksi_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    try {
+      await downloadXlsx(`Laporan_Transaksi_${new Date().toISOString().split('T')[0]}.xlsx`, [
+        { name: 'Riwayat Transaksi', cols: headers, rows, banded: true },
+      ]);
+      w.triggerToast('File Excel (.xlsx) berhasil diunduh.');
+    } catch {
+      w.triggerToast('Gagal membuat file Excel. Silakan coba lagi.');
+    }
   };
 
   return (

@@ -270,6 +270,20 @@ export function useWarehouse() {
     async function checkUser() {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
+        // Cek apakah sudah lebih dari 24 jam sejak login terakhir
+        const LOGIN_KEY = `wms_login_at_${session.user.id}`;
+        const loginAt = localStorage.getItem(LOGIN_KEY);
+        const now = Date.now();
+        const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+
+        if (!loginAt || now - Number(loginAt) > ONE_DAY_MS) {
+          // Session expired (lebih 24 jam) — paksa logout
+          await supabase.auth.signOut();
+          localStorage.removeItem(LOGIN_KEY);
+          setLoadingUser(false);
+          return;
+        }
+
         const { data: profile } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
         if (profile) setUser({ id: session.user.id, nama: profile.nama, role: profile.role, email: session.user.email });
       }
@@ -413,6 +427,8 @@ export function useWarehouse() {
       }
       const { data: profile } = await supabase.from('profiles').select('*').eq('id', data.user.id).single();
       setUser({ id: data.user.id, nama: profile?.nama || 'User', role: profile?.role || 'operator', email: data.user.email });
+      // Simpan waktu login untuk enforce 24 jam session
+      localStorage.setItem(`wms_login_at_${data.user.id}`, String(Date.now()));
       loginAttemptsRef.current = 0;
       setLoginLockSeconds(0);
       setLoginPassword('');
@@ -424,6 +440,8 @@ export function useWarehouse() {
   };
 
   const handleLogout = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.user) localStorage.removeItem(`wms_login_at_${session.user.id}`);
     await supabase.auth.signOut();
     setUser(null);
     setActivePage('dashboard');
@@ -643,7 +661,7 @@ export function useWarehouse() {
   const saveAngkutan = async () => {
     if (user?.role !== 'admin' && user?.role !== 'superadmin') { triggerToast('Akses ditolak: Hanya Admin yang dapat mengelola angkutan.', 'error'); return; }
     if (!aNama || !aSopir) { triggerToast('Nama angkutan dan sopir wajib diisi!', 'error'); return; }
-    const validStatuses = ['tersedia', 'dalam_perjalanan', 'maintenance'];
+    const validStatuses = ['tersedia', 'dalam_perjalanan', 'maintenance', 'tidak_aktif'];
     if (!validStatuses.includes(aStatus)) {
       triggerToast('Status angkutan tidak valid. Pilih status dari daftar.', 'error');
       return;
@@ -673,6 +691,25 @@ export function useWarehouse() {
   const deleteAngkutan = async (id: string) => {
     if (!confirm('Hapus angkutan ini?')) return;
     const ang = angkutans.find(a => a.id === id);
+
+    // Cek langsung ke database — jangan andalkan state lokal yang mungkin tidak lengkap
+    const { data: doTerkait, error: checkError } = await supabase
+      .from('delivery_order')
+      .select('no_do, status')
+      .eq('angkutan_id', id)
+      .not('status', 'in', '("batal","selesai")');
+
+    if (checkError) { triggerToast(checkError.message, 'error'); return; }
+
+    if (doTerkait && doTerkait.length > 0) {
+      const listDO = doTerkait.map((d: { no_do: string }) => d.no_do).join(', ');
+      triggerToast(
+        `Tidak bisa hapus — angkutan masih dipakai di DO aktif: ${listDO}. Batalkan atau selesaikan DO tersebut terlebih dahulu.`,
+        'error'
+      );
+      return;
+    }
+
     const { error } = await supabase.from('angkutan').delete().eq('id', id);
     if (error) { triggerToast(error.message, 'error'); return; }
     await supabase.from('audit_log').insert({
@@ -943,8 +980,20 @@ export function useWarehouse() {
     // "Di Angkutan" mengikuti absen hari ini: supir hadir yang membawa pallet
     // dari gudang kita (default 4 per supir). Kalau belum ada absen hari ini,
     // jatuh ke angka manual / ringkasan dari stok pallet.
+    // Hanya hitung jenis 'reguler' (bukan bantuan) dan deduplicate per angkutan_id
+    // supaya tidak double-count kalau beberapa user mengisi absen angkutan yang sama.
+    const seenAngkutanIds = new Set<string>();
     const absenPalletKitaHariIni = absenRows
-      .filter(r => r.tanggal === today() && r.status === 'hadir' && r.asal_pallet === 'gudang_kita')
+      .filter(r => {
+        if (r.tanggal !== today()) return false;
+        if (r.status !== 'hadir') return false;
+        if (r.asal_pallet !== 'gudang_kita') return false;
+        if (r.jenis !== 'reguler') return false;
+        // skip duplikat angkutan_id yang sama
+        if (r.angkutan_id && seenAngkutanIds.has(r.angkutan_id)) return false;
+        if (r.angkutan_id) seenAngkutanIds.add(r.angkutan_id);
+        return true;
+      })
       .reduce((sum, r) => sum + (r.jumlah_pallet || 0), 0);
     const angkutanManual = palletRingkasan?.pallet_angkutan ?? palletStok?.pallet_angkutan ?? 0;
     const angkutan = absenPalletKitaHariIni > 0 ? absenPalletKitaHariIni : angkutanManual;
@@ -1091,21 +1140,48 @@ export function useWarehouse() {
   useEffect(() => {
     if (!user?.id) return;
     const channel = supabase
-      .channel(`wb-realtime-${user.id}`)
+      .channel(`wms-realtime-${user.id}`)
+      // Whiteboard
       .on('postgres_changes', { event: '*', schema: 'public', table: 'catatan' }, () => {
         void refreshCatatan();
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'catatan_komentar' }, () => {
         void loadComments();
       })
+      // Absen
       .on('postgres_changes', { event: '*', schema: 'public', table: 'absen_harian' }, () => {
         void fetchAbsenData();
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'absen_catatan_harian' }, () => {
         void fetchAbsenData();
       })
+      // Operasional — auto-refresh saat ada perubahan dari user lain
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'transaksi' }, () => {
+        void fetchAll();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'delivery_order' }, () => {
+        void fetchAll();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'delivery_order_item' }, () => {
+        void fetchAll();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pengiriman' }, () => {
+        void fetchAll();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pallet_log' }, () => {
+        void fetchAll();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'angkutan' }, () => {
+        void fetchAll();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'toko' }, () => {
+        void fetchAll();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'produk' }, () => {
+        void fetchAll();
+      })
       .subscribe(status => {
-        if (status === 'SUBSCRIBED') console.info('Realtime whiteboard aktif.');
+        if (status === 'SUBSCRIBED') console.info('Realtime WMS aktif — semua tabel dipantau.');
       });
     return () => {
       void supabase.removeChannel(channel);
