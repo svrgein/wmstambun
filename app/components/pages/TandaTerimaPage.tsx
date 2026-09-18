@@ -310,6 +310,7 @@ const COMPACT_CSS = `
   border-bottom: 3px solid transparent; margin-bottom: -2px;
   border-radius: 6px 6px 0 0; display: flex; align-items: center; gap: 6px;
   font-family: inherit; transition: color 0.12s;
+  min-width: 90px; justify-content: center;
 }
 .tt-tab:hover { color: var(--text); background: var(--card2); }
 .tt-tab.active { color: var(--accent); border-bottom-color: var(--accent); background: var(--card2); }
@@ -558,7 +559,7 @@ export default function TandaTerimaPage({ w }: Props) {
       }
       if (toInsert.length) {
         const { error } = await supa.from('tanda_terima').insert(toInsert);
-        if (error) throw error;
+        if (error) throw new Error(error.message || JSON.stringify(error));
       }
       for (const r of toUpdate) {
         const { error } = await supa.from('tanda_terima').update({
@@ -566,7 +567,7 @@ export default function TandaTerimaPage({ w }: Props) {
           jadwal_kirim: r.jadwal_kirim, customer_code: r.customer_code, customer: r.customer,
           adres: r.adres, destination: r.destination, cement_type: r.cement_type, pack: r.pack, contractor: r.contractor, qty: r.qty,
         }).eq('sdo', r.sdo);
-        if (error) throw error;
+        if (error) throw new Error(error.message || JSON.stringify(error));
       }
       const ringkasan = `Paste ${toInsert.length} baru${toUpdate.length ? ` + update ${toUpdate.length}` : ''}${skipExisting ? ` (skip ${dupSet.size} double)` : ''} (${ak || '—'}, ${fmtDate(selectedDate)})`;
       await supa.from('audit_log').insert({ user_id: w.user.id, tabel: 'tanda_terima', aksi: 'UPSERT', ringkasan });
@@ -574,8 +575,15 @@ export default function TandaTerimaPage({ w }: Props) {
       setPasteValue(''); setShowPaste(false);
       await loadRecords();
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      console.error('Gagal simpan paste:', msg);
+      let msg = 'Unknown error';
+      if (e instanceof Error) {
+        msg = e.message;
+      } else if (typeof e === 'object' && e !== null && 'message' in e) {
+        msg = String((e as Record<string, unknown>).message);
+      } else {
+        msg = String(e);
+      }
+      console.error('Gagal simpan paste:', msg, e);
       w.triggerToast(`Gagal menyimpan: ${msg}`, 'error');
     } finally {
       setSaving(false);
@@ -662,9 +670,25 @@ export default function TandaTerimaPage({ w }: Props) {
       if (d !== 0) return d;
       return (a.created_at || '').localeCompare(b.created_at || '');
     });
-    const cols = ['No','PRINT DATE','ORDER DATE','SDO','JADWAL KIRIM','CUSTOMER CODE',
-      'CUSTOMER','ADRES','DESTINATION','CEMENT TYPE','PACK','.','QTY','STATUS','DELV DATE','SETOR DATE','SETORAN']
-      .map(h => ({ header: h, width: h === 'ADRES' ? 42 : h === '.' ? 24 : 14 }));
+    const cols = [
+      { header: 'No',            width: 5 },
+      { header: 'PRINT DATE',    width: 14 },
+      { header: 'ORDER DATE',    width: 14 },
+      { header: 'SDO',           width: 14 },
+      { header: 'JADWAL KIRIM',  width: 14, hidden: true },
+      { header: 'CUSTOMER CODE', width: 14 },
+      { header: 'CUSTOMER',      width: 24 },
+      { header: 'ADRES',         width: 42, hidden: true },
+      { header: 'DESTINATION',   width: 18 },
+      { header: 'CEMENT TYPE',   width: 14 },
+      { header: 'PACK',          width: 10 },
+      { header: '.',             width: 24 },
+      { header: 'QTY',           width: 8  },
+      { header: 'STATUS',        width: 16 },
+      { header: 'DELV DATE',     width: 14 },
+      { header: 'SETOR DATE',    width: 14 },
+      { header: 'SETORAN',       width: 36 },
+    ];
     const dataRows = sorted.map((r, i) => [
       i + 1, fmtDate(r.print_date), r.order_date ? fmtDate(r.order_date) : '', r.sdo,
       r.jadwal_kirim ? fmtDate(r.jadwal_kirim) : '', r.customer_code || '', r.customer || '',

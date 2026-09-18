@@ -9,6 +9,7 @@ export interface XlsxCol {
   numFmt?: string;
   align?: 'left' | 'center' | 'right';
   wrap?: boolean;
+  hidden?: boolean;   // sembunyiin kolom (bisa di-unhide manual di Excel)
 }
 
 export interface XlsxSheet {
@@ -105,6 +106,7 @@ export async function downloadXlsx(filename: string, sheets: XlsxSheet[]): Promi
       let colWidth = meta.width ?? clampWidth(longest * 1.05 + 3);
       if (meta.wrap) colWidth = Math.max(meta.width ?? 40, colWidth);
       ws.getColumn(ci).width = colWidth;
+      if (meta.hidden) ws.getColumn(ci).hidden = true;
     });
 
     // ── filter otomatis ──

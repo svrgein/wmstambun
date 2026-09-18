@@ -270,14 +270,13 @@ export function useWarehouse() {
     async function checkUser() {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
-        // Cek apakah sudah lebih dari 24 jam sejak login terakhir
+        // Cek apakah sudah ganti hari sejak login terakhir — paksa login ulang tiap hari
         const LOGIN_KEY = `wms_login_at_${session.user.id}`;
         const loginAt = localStorage.getItem(LOGIN_KEY);
-        const now = Date.now();
-        const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+        const todayStr = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD lokal
 
-        if (!loginAt || now - Number(loginAt) > ONE_DAY_MS) {
-          // Session expired (lebih 24 jam) — paksa logout
+        if (!loginAt || loginAt !== todayStr) {
+          // Beda hari atau belum pernah login lewat app ini — paksa login ulang
           await supabase.auth.signOut();
           localStorage.removeItem(LOGIN_KEY);
           setLoadingUser(false);
@@ -326,12 +325,12 @@ export function useWarehouse() {
           supabase.from('pallet_stok').select('*').limit(1).single(),
           supabase.from('v_pallet_ringkasan').select('*').single(),
         ]);
-      if (stokRes.error) throw stokRes.error;
-      if (trxRes.error) throw trxRes.error;
-      if (tokoRes.error) throw tokoRes.error;
-      if (angkutanRes.error) throw angkutanRes.error;
-      if (doRes.error) throw doRes.error;
-      if (palletRes.error) throw palletRes.error;
+      if (stokRes.error) throw new Error(stokRes.error.message);
+      if (trxRes.error) throw new Error(trxRes.error.message);
+      if (tokoRes.error) throw new Error(tokoRes.error.message);
+      if (angkutanRes.error) throw new Error(angkutanRes.error.message);
+      if (doRes.error) throw new Error(doRes.error.message);
+      if (palletRes.error) throw new Error(palletRes.error.message);
       const nextDeliveryOrders = doRes.data || [];
       setProducts(sortProductsByCustomOrder(stokRes.data || []));
       setTransactions(trxRes.data || []);
@@ -427,8 +426,8 @@ export function useWarehouse() {
       }
       const { data: profile } = await supabase.from('profiles').select('*').eq('id', data.user.id).single();
       setUser({ id: data.user.id, nama: profile?.nama || 'User', role: profile?.role || 'operator', email: data.user.email });
-      // Simpan waktu login untuk enforce 24 jam session
-      localStorage.setItem(`wms_login_at_${data.user.id}`, String(Date.now()));
+      // Simpan tanggal login hari ini — session expired saat ganti hari
+      localStorage.setItem(`wms_login_at_${data.user.id}`, new Date().toLocaleDateString('en-CA'));
       loginAttemptsRef.current = 0;
       setLoginLockSeconds(0);
       setLoginPassword('');
@@ -1052,7 +1051,7 @@ export function useWarehouse() {
         .from('catatan_komentar')
         .select('*')
         .order('created_at', { ascending: true });
-      if (error) throw error;
+      if (error) throw new Error(error.message);
       const grouped = (data || []).reduce<Record<string, CatatanKomentar[]>>((acc, row) => {
         if (!row.catatan_id) return acc;
         (acc[row.catatan_id] = acc[row.catatan_id] || []).push({
@@ -1139,6 +1138,13 @@ export function useWarehouse() {
   // Realtime: pantau perubahan catatan & komentar dari pengguna lain.
   useEffect(() => {
     if (!user?.id) return;
+
+    // Debounce fetchAll — hindari double-fetch saat user sendiri yang trigger perubahan
+    let fetchAllTimer: ReturnType<typeof setTimeout> | null = null;
+    const debouncedFetchAll = () => {
+      if (fetchAllTimer) clearTimeout(fetchAllTimer);
+      fetchAllTimer = setTimeout(() => { void fetchAll(); }, 600);
+    };
     const channel = supabase
       .channel(`wms-realtime-${user.id}`)
       // Whiteboard
@@ -1157,33 +1163,34 @@ export function useWarehouse() {
       })
       // Operasional — auto-refresh saat ada perubahan dari user lain
       .on('postgres_changes', { event: '*', schema: 'public', table: 'transaksi' }, () => {
-        void fetchAll();
+        debouncedFetchAll();
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'delivery_order' }, () => {
-        void fetchAll();
+        debouncedFetchAll();
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'delivery_order_item' }, () => {
-        void fetchAll();
+        debouncedFetchAll();
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pengiriman' }, () => {
-        void fetchAll();
+        debouncedFetchAll();
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pallet_log' }, () => {
-        void fetchAll();
+        debouncedFetchAll();
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'angkutan' }, () => {
-        void fetchAll();
+        debouncedFetchAll();
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'toko' }, () => {
-        void fetchAll();
+        debouncedFetchAll();
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'produk' }, () => {
-        void fetchAll();
+        debouncedFetchAll();
       })
       .subscribe(status => {
         if (status === 'SUBSCRIBED') console.info('Realtime WMS aktif — semua tabel dipantau.');
       });
     return () => {
+      if (fetchAllTimer) clearTimeout(fetchAllTimer);
       void supabase.removeChannel(channel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
