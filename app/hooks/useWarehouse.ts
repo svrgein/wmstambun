@@ -1260,7 +1260,15 @@ export function useWarehouse() {
     }
     const result = id
       ? await supabase.from('absen_harian').update({ ...input, updated_at: new Date().toISOString() }).eq('id', id).select().single()
-      : await supabase.from('absen_harian').insert({ ...input, created_by: user.id }).select().single();
+      : (() => {
+          // Cek existing dulu — jika sudah ada untuk angkutan_id + tanggal yang sama, update bukan insert
+          const existing = input.angkutan_id
+            ? absenRows.find(r => r.angkutan_id === input.angkutan_id && r.tanggal === input.tanggal)
+            : null;
+          return existing
+            ? supabase.from('absen_harian').update({ ...input, updated_at: new Date().toISOString() }).eq('id', existing.id).select().single()
+            : supabase.from('absen_harian').insert({ ...input, created_by: user.id }).select().single();
+        })();
     if (result.error) {
       triggerToast(`Gagal simpan absen: ${result.error.message}`, 'error');
       return null;

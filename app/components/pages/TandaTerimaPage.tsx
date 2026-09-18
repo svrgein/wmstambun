@@ -288,8 +288,8 @@ export default function TandaTerimaPage({ w }: Props) {
       const { data, error } = await supa
         .from('tanda_terima')
         .select('*')
-        .order('print_date', { ascending: false })
-        .order('sdo', { ascending: true })
+        .order('print_date', { ascending: true })
+        .order('created_at', { ascending: true })  // preserve urutan paste
         .range(from, from + PAGE - 1);
       if (error) {
         const msg = error.message || '';
@@ -564,10 +564,16 @@ export default function TandaTerimaPage({ w }: Props) {
   };
 
   const exportSheet = async (name: string, rows: TandaTerima[]) => {
+    // Sort tgl lama → baru, lalu urutan paste (created_at)
+    const sorted = [...rows].sort((a, b) => {
+      const d = a.print_date.localeCompare(b.print_date);
+      if (d !== 0) return d;
+      return (a.created_at || '').localeCompare(b.created_at || '');
+    });
     const cols = ['No','PRINT DATE','ORDER DATE','SDO','JADWAL KIRIM','CUSTOMER CODE',
       'CUSTOMER','ADRES','DESTINATION','CEMENT TYPE','PACK','.','QTY','STATUS','DELV DATE','SETORAN']
       .map(h => ({ header: h, width: h === 'ADRES' ? 42 : 14 }));
-    const dataRows = rows.map((r, i) => [
+    const dataRows = sorted.map((r, i) => [
       i + 1, fmtDate(r.print_date), r.order_date ? fmtDate(r.order_date) : '', r.sdo,
       r.jadwal_kirim ? fmtDate(r.jadwal_kirim) : '', r.customer_code || '', r.customer || '',
       r.adres || '', r.destination || '', r.cement_type || '', r.pack || '', '.',
