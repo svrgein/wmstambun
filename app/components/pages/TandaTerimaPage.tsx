@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ChevronDown, ClipboardPaste, Download, History,
   MoreVertical, Pencil, Search, Stamp, Truck, X,
@@ -258,8 +258,12 @@ const COMPACT_CSS = `
 .tt-compact tbody tr:hover td { background: rgba(246,166,10,0.06) !important; }
 .tt-compact .badge { font-size: 10.5px; padding: 2px 8px; }
 .tt-compact .icon-btn { padding: 2px 3px; }
-.tt-flash td { animation: tt-flash 2.5s ease-out; }
-@keyframes tt-flash { 0%,30% { background: rgba(246,166,10,0.28) !important; } 100% { background: transparent; } }
+.tt-flash td { animation: tt-flash 3s ease-out; }
+@keyframes tt-flash {
+  0%    { background: rgba(246,166,10,0.55) !important; outline: 2px solid var(--accent); }
+  40%   { background: rgba(246,166,10,0.35) !important; }
+  100%  { background: transparent !important; outline: none; }
+}
 
 /* ─── kolom responsive ─── */
 @media (max-width: 768px) {
@@ -346,6 +350,8 @@ export default function TandaTerimaPage({ w }: Props) {
   const [category, setCategory] = useState<Category>('GMS');
   const [selectedAngkutan, setSelectedAngkutan] = useState('');
   const [q, setQ] = useState('');
+  const [qDebounced, setQDebounced] = useState('');
+  const qTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [riwayatQ, setRiwayatQ] = useState('');
   const [pasteValue, setPasteValue] = useState('');
   const [saving, setSaving] = useState(false);
@@ -371,6 +377,8 @@ export default function TandaTerimaPage({ w }: Props) {
 
   const admin = isAdmin(w.user?.role);
   const supa = w.supabase;
+  // today() dipanggil sekali per render cycle, bukan per baris
+  const todayDate = useMemo(() => today(), []);
 
   const loadRecords = async () => {
     // Supabase default max 1000 per request — loop sampai semua data ter-load
@@ -449,34 +457,37 @@ export default function TandaTerimaPage({ w }: Props) {
 
   // DO tertunda: print_date < hari ini & belum terkirim/batal → notif "N hari blom kirim"
   const pendingRows = useMemo(() => {
-    const t = today();
     return (records || []).filter(r =>
-      r.print_date < t && (r.status_kirim === 'belum' || r.status_kirim === 'tunggu_info'));
-  }, [records]);
+      r.print_date < todayDate && (r.status_kirim === 'belum' || r.status_kirim === 'tunggu_info'));
+  }, [records, todayDate]);
   const pendingCount = pendingRows.length;
-  const daysSince = (d: string | null) => {
+
+  // daysSince pakai todayDate yang sudah di-memoize — tidak recalculate per baris
+  const daysSince = useCallback((d: string | null) => {
     if (!d) return 0;
-    return Math.max(0, Math.round((Date.parse(today() + 'T12:00:00') - Date.parse(d + 'T12:00:00')) / 86400000));
-  };
+    return Math.max(0, Math.round((Date.parse(todayDate + 'T12:00:00') - Date.parse(d + 'T12:00:00')) / 86400000));
+  }, [todayDate]);
 
   // Blom setor: udah terkirim tapi belum disetor ke pusat → telat setor = daysSince(delv_date).
   const blomSetorRows = useMemo(() =>
     (records || []).filter(r => r.status_kirim === 'terkirim' && r.status_setoran === 'belum'), [records]);
   const blomSetorCount = blomSetorRows.length;
-  const TELAT_SETOR_HARI = 2; // ambang "telat"
-  const telatSetorCount = blomSetorRows.filter(r => daysSince(r.delv_date) > TELAT_SETOR_HARI).length;
+  const TELAT_SETOR_HARI = 2;
+  const telatSetorCount = useMemo(() =>
+    blomSetorRows.filter(r => daysSince(r.delv_date) > TELAT_SETOR_HARI).length,
+  [blomSetorRows, daysSince]);
 
   const filtered = useMemo(() => {
-    const needle = q.trim().toLowerCase();
+    const needle = qDebounced.trim().toLowerCase();
     const match = (r: TandaTerima) => !needle
       || r.sdo.toLowerCase().includes(needle)
       || (r.customer || '').toLowerCase().includes(needle)
       || (r.customer_code || '').toLowerCase().includes(needle);
     if (pending) return pendingRows.filter(match);
     if (blomSetor) return blomSetorRows.filter(match);
-    if (needle) return dayRows.filter(match);  // search lintas kategori
+    if (needle) return dayRows.filter(match);
     return dayRows.filter(r => rowCategory(r.angkutan) === category);
-  }, [records, dayRows, category, q, pending, pendingRows, blomSetor, blomSetorRows]);
+  }, [records, dayRows, category, qDebounced, pending, pendingRows, blomSetor, blomSetorRows]);
 
   const sheets = useMemo(() => {
     const map = new Map<string, TandaTerima[]>();
@@ -659,7 +670,13 @@ export default function TandaTerimaPage({ w }: Props) {
     setSelectedDate(r.print_date);
     setCategory(rowCategory(r.angkutan));
     if (mode === 'kirim') await toggleKirim(r, kirimDate); else await markDisetor(r, setorDate);
-    setHighlightId(r.id);  // scroll + highlight setelah render
+    // scroll setelah DOM update — pakai rAF biar baris sudah ter-render
+    const targetId = r.id;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        setHighlightId(targetId);
+      });
+    });
     setQuickSdo(''); quickRef.current?.focus();
   };
 
@@ -867,7 +884,17 @@ export default function TandaTerimaPage({ w }: Props) {
             {/* search */}
             <div className="search-box" style={{ flex: '1 1 160px', marginLeft: 'auto' }}>
               <Search />
-              <input placeholder="Cari SDO / customer…" value={q} onChange={e => setQ(e.target.value)} />
+              <input
+                placeholder="Cari SDO / customer…"
+                value={q}
+                onChange={e => {
+                  const val = e.target.value;
+                  setQ(val);
+                  // debounce 300ms — filter tidak jalan tiap ketikan
+                  if (qTimerRef.current) clearTimeout(qTimerRef.current);
+                  qTimerRef.current = setTimeout(() => setQDebounced(val), 300);
+                }}
+              />
             </div>
 
             {/* quick update */}
@@ -973,7 +1000,7 @@ export default function TandaTerimaPage({ w }: Props) {
                       </thead>
                       <tbody>
                         {rows.map((r, i) => {
-                          const telat = r.print_date < today() && (r.status_kirim === 'belum' || r.status_kirim === 'tunggu_info');
+                          const telat = r.print_date < todayDate && (r.status_kirim === 'belum' || r.status_kirim === 'tunggu_info');
                           const telatSetor = r.status_kirim === 'terkirim' && r.status_setoran === 'belum' && r.delv_date;
                           return (
                             <tr key={r.id} data-tt-row={r.id}
@@ -1104,8 +1131,10 @@ export default function TandaTerimaPage({ w }: Props) {
                 <label>Tanggal Terkirim</label>
                 <input type="date" value={kirimDate} onChange={e => setKirimDate(e.target.value)} />
               </div>
-              <div style={{ fontSize: 12, color: 'var(--muted)' }}>
-                Print date: <b>{fmtDate(kirimFor.print_date)}</b>
+              <div style={{ fontSize: 12, color: 'var(--muted)', display: 'grid', gap: 4 }}>
+                <div>Print date: <b>{fmtDate(kirimFor.print_date)}</b></div>
+                <div>Angkutan: <b style={{ color: 'var(--text)' }}>{kirimFor.angkutan || '—'}</b></div>
+                <div>Customer: <b style={{ color: 'var(--text)' }}>{kirimFor.customer || '—'}</b></div>
               </div>
             </div>
             <div className="flex-row" style={{ justifyContent: 'flex-end', gap: 8 }}>
