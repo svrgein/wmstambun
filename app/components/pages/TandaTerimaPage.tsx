@@ -176,29 +176,27 @@ const parseTandaTerima = (paste: string): ParsedRow[] => {
     let qty: number | null = null;
 
     if (rest.length >= 4) {
-      // Cari qty — kolom angka di paling belakang (skip titik '.')
-      let qtyIdx = rest.length - 1;
-      if (rest[qtyIdx] === '.') qtyIdx--; // skip titik separator
-      const qtyStr = rest[qtyIdx] || '';
+      // Buang titik '.' separator dulu dari rest sebelum parse
+      const restClean = rest.filter(c => c !== '.');
+
+      // Ambil dari belakang: qty, pack, cement, dest
+      const qtyStr = restClean[restClean.length - 1] || '';
       const numVal = Number(qtyStr.replace(/[^\d.]/g, ''));
       if (!isNaN(numVal) && numVal > 0 && numVal <= 50000) {
         qty = numVal;
       }
 
-      // pack = sebelum qty (atau sebelum titik)
-      const packIdx = qtyIdx - 1;
-      pack = rest[packIdx] || null;
-      cement_type = rest[packIdx - 1] || null;
-      destination = rest[packIdx - 2] || null;
+      const packIdx = restClean.length - 2;
+      pack = restClean[packIdx] || null;
+      cement_type = restClean[packIdx - 1] || null;
+      destination = restClean[packIdx - 2] || null;
 
-      const head = rest.slice(0, packIdx - 2);
-      // buang titik dari head kalau ada
-      const headClean = head.filter(c => c !== '.');
-      if (headClean.length > 0 && /^\d{4,12}$/.test(headClean[0])) {
-        customer_code = headClean.shift() || null;
+      const head = restClean.slice(0, packIdx - 2);
+      if (head.length > 0 && /^\d{4,12}$/.test(head[0])) {
+        customer_code = head.shift() || null;
       }
-      if (headClean.length > 0) customer = headClean.shift() || null;
-      if (headClean.length > 0) adres = headClean.join(' ') || null;
+      if (head.length > 0) customer = head.shift() || null;
+      if (head.length > 0) adres = head.join(' ') || null;
     } else {
       const headClean = rest.filter(c => c !== '.');
       if (headClean.length > 0 && /^\d{4,12}$/.test(headClean[0])) customer_code = headClean.shift() || null;
@@ -1049,9 +1047,21 @@ export default function TandaTerimaPage({ w }: Props) {
                               <td className="font-bold" style={{ fontFamily: 'monospace', whiteSpace: 'nowrap', color: 'var(--accent)', letterSpacing: '0.5px' }}>
                                 {r.sdo}
                               </td>
-                              <td style={{ minWidth: 0, maxWidth: 170 }}>
+                              <td style={{ minWidth: 0, maxWidth: 180 }}>
                                 <div className="font-bold" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.customer || '—'}</div>
-                                {r.customer_code && <div style={{ fontSize: 10, color: 'var(--muted)', fontFamily: 'monospace', marginTop: 1 }}>{r.customer_code}</div>}
+                                <div style={{ display: 'flex', gap: 5, marginTop: 1, alignItems: 'center', flexWrap: 'nowrap' }}>
+                                  {r.customer_code && (
+                                    <span style={{ fontSize: 10, color: 'var(--muted)', fontFamily: 'monospace' }}>{r.customer_code}</span>
+                                  )}
+                                  {r.customer_code && r.angkutan && (
+                                    <span style={{ fontSize: 9, color: 'var(--border2)' }}>·</span>
+                                  )}
+                                  {r.angkutan && (
+                                    <span style={{ fontSize: 10, color: 'var(--accent2)', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                      {r.angkutan}
+                                    </span>
+                                  )}
+                                </div>
                               </td>
                               <td className="tt-col-dest" style={{ maxWidth: 110, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-sub)' }}>{r.destination || '—'}</td>
                               <td className="tt-col-cement" style={{ whiteSpace: 'nowrap', color: 'var(--text-sub)' }}>
