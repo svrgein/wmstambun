@@ -297,9 +297,12 @@ const COMPACT_CSS = `
 
 /* ─── filter toolbar ─── */
 .tt-toolbar {
-  display: flex; gap: 7px; flex-wrap: wrap; align-items: center;
-  background: var(--card2); border: 1px solid var(--border);
-  border-radius: 10px; padding: 8px 12px; margin-bottom: 10px;
+  display: flex; gap: 6px; flex-wrap: wrap; align-items: center;
+  margin-bottom: 10px;
+}
+.tt-toolbar-sep {
+  width: 1px; height: 22px; background: var(--border2);
+  margin: 0 2px; flex-shrink: 0;
 }
 .tt-toolbar-label {
   font-size: 10px; font-weight: 800; text-transform: uppercase;
@@ -327,11 +330,21 @@ const COMPACT_CSS = `
 /* ─── sheet header ─── */
 .tt-sheet-head {
   display: flex; justify-content: space-between; align-items: center;
-  padding: 9px 14px; background: var(--card2); border-bottom: 1px solid var(--border);
+  padding: 10px 14px; background: var(--card2); border-bottom: 1px solid var(--border);
   gap: 8px; flex-wrap: wrap;
 }
-.tt-sheet-title { font-weight: 800; font-size: 13px; letter-spacing: 0.4px; }
-.tt-sheet-sub { font-size: 10.5px; color: var(--muted); margin-top: 2px; }
+.tt-sheet-title { font-weight: 800; font-size: 13.5px; letter-spacing: 0.3px; }
+.tt-sheet-meta {
+  display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+  margin-top: 3px;
+}
+.tt-sheet-stat {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11px; font-weight: 700; color: var(--muted);
+}
+.tt-sheet-stat b { color: var(--text); }
+.tt-sheet-stat.ok b { color: var(--success); }
+.tt-sheet-stat.warn b { color: var(--warn); }
 
 /* ─── quick update popover ─── */
 .tt-quick-pop {
@@ -374,6 +387,7 @@ export default function TandaTerimaPage({ w }: Props) {
   const [pending, setPending] = useState(false);
   const [dateMode, setDateMode] = useState<'print' | 'delv'>('print');
   const [blomSetor, setBlomSetor] = useState(false);
+  const [exporting, setExporting] = useState<string | null>(null);
 
   const admin = isAdmin(w.user?.role);
   const supa = w.supabase;
@@ -681,12 +695,13 @@ export default function TandaTerimaPage({ w }: Props) {
   };
 
   const exportSheet = async (name: string, rows: TandaTerima[]) => {
-    // Sort tgl lama → baru, lalu urutan paste (created_at)
-    const sorted = [...rows].sort((a, b) => {
-      const d = a.print_date.localeCompare(b.print_date);
-      if (d !== 0) return d;
-      return (a.created_at || '').localeCompare(b.created_at || '');
-    });
+    setExporting(name);
+    try {
+      const sorted = [...rows].sort((a, b) => {
+        const d = a.print_date.localeCompare(b.print_date);
+        if (d !== 0) return d;
+        return (a.created_at || '').localeCompare(b.created_at || '');
+      });
     const cols = [
       { header: 'No',            width: 5 },
       { header: 'PRINT DATE',    width: 14 },
@@ -721,6 +736,9 @@ export default function TandaTerimaPage({ w }: Props) {
       ? `${rangeDari}_sd_${rangeSampai}`
       : allDates ? 'ALL' : selectedDate;
     await downloadXlsx(`Tanda_Terima_${safeName}_${dateSuffix}`, [{ name: safeName, cols, rows: dataRows }]);
+    } finally {
+      setExporting(null);
+    }
   };
 
   const exportCategory = async () => {
@@ -840,8 +858,8 @@ export default function TandaTerimaPage({ w }: Props) {
 
           {/* ── FILTER TOOLBAR ── */}
           <div className="tt-toolbar">
-            {/* kolom tanggal: print atau delv */}
-            <span className="tt-toolbar-label">Berdasar</span>
+            {/* Mode kolom tanggal */}
+            <span className="tt-toolbar-label">Filter</span>
             <div className="seg" style={{ width: 'auto' }}>
               <button type="button"
                 style={{ background: dateMode === 'print' ? 'var(--accent)' : 'transparent', color: dateMode === 'print' ? '#211500' : 'var(--muted)' }}
@@ -851,8 +869,9 @@ export default function TandaTerimaPage({ w }: Props) {
                 onClick={() => { setDateMode('delv'); setAllDates(false); setRangeMode(false); }}>Kirim</button>
             </div>
 
-            <span className="tt-toolbar-label" style={{ marginLeft: 4 }}>Tanggal</span>
-            {/* mode selector: hari / range / semua */}
+            <div className="tt-toolbar-sep" />
+
+            {/* Mode rentang waktu */}
             <div className="seg" style={{ width: 'auto' }}>
               <button type="button"
                 style={{ background: !rangeMode && !allDates ? 'var(--card3)' : 'transparent', color: !rangeMode && !allDates ? 'var(--text)' : 'var(--muted)' }}
@@ -865,7 +884,7 @@ export default function TandaTerimaPage({ w }: Props) {
                 onClick={() => { setAllDates(true); setRangeMode(false); }}>Semua</button>
             </div>
 
-            {/* input nilai tanggal */}
+            {/* Input tanggal */}
             {!rangeMode && !allDates && (
               <input aria-label="Tanggal" type="date" value={selectedDate}
                 onChange={e => setSelectedDate(e.target.value)}
@@ -881,8 +900,10 @@ export default function TandaTerimaPage({ w }: Props) {
               </>
             )}
 
-            {/* search */}
-            <div className="search-box" style={{ flex: '1 1 160px', marginLeft: 'auto' }}>
+            <div className="tt-toolbar-sep" />
+
+            {/* Search */}
+            <div className="search-box" style={{ flex: '1 1 160px' }}>
               <Search />
               <input
                 placeholder="Cari SDO / customer…"
@@ -890,14 +911,13 @@ export default function TandaTerimaPage({ w }: Props) {
                 onChange={e => {
                   const val = e.target.value;
                   setQ(val);
-                  // debounce 300ms — filter tidak jalan tiap ketikan
                   if (qTimerRef.current) clearTimeout(qTimerRef.current);
                   qTimerRef.current = setTimeout(() => setQDebounced(val), 300);
                 }}
               />
             </div>
 
-            {/* quick update */}
+            {/* Quick update */}
             {admin && (
               <QuickPopover mode={mode} setMode={setMode} quickSdo={quickSdo} setQuickSdo={setQuickSdo}
                 apply={applyQuick} quickRef={quickRef} records={records || []}
@@ -973,10 +993,27 @@ export default function TandaTerimaPage({ w }: Props) {
                   <div className="tt-sheet-head">
                     <div>
                       <div className="tt-sheet-title">{name}</div>
-                      <div className="tt-sheet-sub">{rows.length} DO · {allDates ? 'semua tanggal' : rangeMode && rangeDari && rangeSampai ? `${fmtDate(rangeDari)} — ${fmtDate(rangeSampai)}` : monthLabel(selectedDate)}</div>
+                      <div className="tt-sheet-meta">
+                        <span className="tt-sheet-stat"><b>{rows.length}</b> DO</span>
+                        <span className="tt-sheet-stat ok">
+                          <b>{rows.filter(r => r.status_kirim === 'terkirim').length}</b> terkirim
+                        </span>
+                        <span className="tt-sheet-stat warn">
+                          <b>{rows.filter(r => r.status_setoran === 'belum' && r.status_kirim === 'terkirim').length}</b> blm setor
+                        </span>
+                        <span className="tt-sheet-stat" style={{ color: 'var(--muted)' }}>
+                          {allDates ? 'semua tgl' : rangeMode && rangeDari && rangeSampai ? `${fmtDate(rangeDari)} — ${fmtDate(rangeSampai)}` : monthLabel(selectedDate)}
+                        </span>
+                      </div>
                     </div>
-                    <button className="btn btn-blue btn-sm" onClick={() => void exportSheet(name, rows)}>
-                      <Download style={{ width: 13, height: 13 }} /> Excel
+                    <button
+                      className="btn btn-blue btn-sm"
+                      onClick={() => void exportSheet(name, rows)}
+                      disabled={exporting === name}
+                      style={{ minWidth: 90 }}>
+                      {exporting === name
+                        ? <><span style={{ opacity: 0.7 }}>Ekspor…</span></>
+                        : <><Download style={{ width: 13, height: 13 }} /> Ekspor Excel</>}
                     </button>
                   </div>
                   <div className="table-wrap" style={{ border: 'none' }}>
@@ -990,9 +1027,9 @@ export default function TandaTerimaPage({ w }: Props) {
                           <th>CUSTOMER</th>
                           <th className="tt-col-dest">DEST</th>
                           <th className="tt-col-cement">SEMEN</th>
-                          <th className="tt-col-dest" style={{ minWidth: 40 }}>.</th>
+                          <th className="tt-col-dest" style={{ minWidth: 40 }}>KODE</th>
                           <th style={{ width: 46, textAlign: 'right' }}>QTY</th>
-                          <th style={{ minWidth: 90 }}>STATUS KIRIM</th>
+                          <th style={{ minWidth: 90 }}>KIRIM</th>
                           <th className="tt-col-delv">DELV</th>
                           <th style={{ minWidth: 80 }}>SETOR</th>
                           {admin && <th style={{ width: 32 }} />}
@@ -1058,7 +1095,7 @@ export default function TandaTerimaPage({ w }: Props) {
                                   <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>{r.alasan_tunggu}</div>
                                 )}
                                 {r.status_kirim === 'terkirim' && r.delv_date && (
-                                  <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>{fmtDate(r.delv_date)}</div>
+                                  <div style={{ fontSize: 11, color: 'var(--text-sub)', marginTop: 2, fontWeight: 600 }}>{fmtDate(r.delv_date)}</div>
                                 )}
                                 {telat && (
                                   <div style={{ fontSize: 10, color: 'var(--danger)', fontWeight: 800, marginTop: 2 }}>
@@ -1091,7 +1128,7 @@ export default function TandaTerimaPage({ w }: Props) {
                                   <span className={`badge ${statusSetoranBadge[r.status_setoran]}`}>{statusSetoranLabel[r.status_setoran]}</span>
                                 )}
                                 {r.setor_date && r.status_setoran === 'disetor' && (
-                                  <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>{fmtDate(r.setor_date)}</div>
+                                  <div style={{ fontSize: 11, color: 'var(--text-sub)', marginTop: 2, fontWeight: 600 }}>{fmtDate(r.setor_date)}</div>
                                 )}
                                 {telatSetor && (
                                   <div style={{ fontSize: 10, fontWeight: 800, marginTop: 2, color: daysSince(r.delv_date) > 2 ? 'var(--danger)' : 'var(--warn)' }}>
